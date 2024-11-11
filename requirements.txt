@@ -1,3 +1,6 @@
 jupyter
 torch
 torchvision
+tqdm
+tensorboard
+pandas
