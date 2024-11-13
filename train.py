@@ -6,12 +6,14 @@ from typing import Tuple, List, Dict
 from pprint import pprint
 
 import torch
+import torchvision
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.models import ResNet18_Weights
 
 from domgen.data import PACSData
-import torchvision
+from domgen.eval import plot_training_curves, plot_accuracies
+
 from tqdm import tqdm
 import logging
 
@@ -313,3 +315,6 @@ if __name__ == '__main__':
     pprint(df)
     logger.info(f'General Average Accuracy: {general_average_accuracy}')
     logger.info(f'Overall Worst Case Performance: {overall_worst_case_performance}')
+    logger.info(f'Saving plots to {EXPERIMENT_NAME}/plots/')
+    plot_training_curves(f'experiments/{EXPERIMENT_NAME}/results.csv')
+    plot_accuracies(f'experiments/{EXPERIMENT_NAME}/')
