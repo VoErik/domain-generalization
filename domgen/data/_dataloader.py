@@ -24,7 +24,7 @@ class PACSData:
     def _get_data(self) -> None:
         """Creates PyTorch ImageFolder for each domain in the dataset."""
         transform = transforms.Compose([
-            transforms.PILToTensor(),
+            transforms.ToTensor(),
         ])
 
         self.data = {domain: {'dataset': ImageFolder(f'{self.path}/{domain}',
