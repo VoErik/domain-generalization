@@ -94,7 +94,7 @@ def _plot_metric_curves(run_data: Dict[str, List],
                         ylabel: str,
                         title: str,
                         save_path: str = None):
-    """Plot the metric curves for each domain with an average line and margin.
+    """Plot the metric curves for each domain with an average line and min-max margin.
     :param run_data: nested dictionary with run and domain data.
     :param metric_name: name of the metric to plot.
     :param ylabel: name of the y-axis label.
@@ -106,21 +106,21 @@ def _plot_metric_curves(run_data: Dict[str, List],
         metrics = np.array([run[metric_name].values for run in runs])
 
         mean_curve = np.mean(metrics, axis=0)
-        std_curve = np.std(metrics, axis=0)
+        min_curve = np.min(metrics, axis=0)
+        max_curve = np.max(metrics, axis=0)
 
         fig = plt.figure(figsize=(10, 6))
         plt.plot(epochs, mean_curve, label='Average', color='black', linestyle='--', linewidth=1.5)
-        plt.fill_between(epochs, mean_curve - std_curve, mean_curve + std_curve, color='green', alpha=0.4,
-                         label='±1 std dev')
+        plt.fill_between(epochs, min_curve, max_curve, color='blue', alpha=0.4, label='Min-Max Range')
 
-        # Individual runs (for reference)
+        colormap = cm.get_cmap('cividis', len(metrics))  # Use 'tab20' colormap for distinct colors
         for run_idx, run_metrics in enumerate(metrics):
             plt.plot(epochs,
                      run_metrics,
-                     color='red',
+                     color=colormap(run_idx),
                      alpha=0.7,
                      linewidth=0.8,
-                     label=f'Runs' if run_idx == 0 else '')
+                     label=f'Run' if run_idx == 0 else '')
 
         plt.xlabel("Epoch")
         plt.ylabel(ylabel)
@@ -137,6 +137,7 @@ def _plot_metric_curves(run_data: Dict[str, List],
             save_name = f'{domain}_{metric_name}_plot'
             _save_plot(save_path, fig, save_name)
         plt.show()
+
 
 
 # TODO: integrate into _plot_metric_curves function
