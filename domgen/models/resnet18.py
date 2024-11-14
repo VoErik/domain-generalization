@@ -4,9 +4,6 @@ from torch import Tensor
 from typing import Type
 from BasicBlock import BasicBlock
 
-# https://www.geeksforgeeks.org/resnet18-from-scratch-using-pytorch/
-# https://debuggercafe.com/implementing-resnet18-in-pytorch-from-scratch/
-
 
 class ResNet18(nn.Module):
     def __init__(
