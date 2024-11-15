@@ -21,7 +21,7 @@ class BasicBlock (nn.Module):
         self.bn1 = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = nn.Conv2d(
-            in_channels,
+            out_channels,
             out_channels,
             kernel_size=3,
             padding=1,
