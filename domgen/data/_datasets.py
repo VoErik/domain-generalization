@@ -112,6 +112,8 @@ class DomainDataset(MultiDomainDataset):
 def get_dataset(name: str, root_dir: str, test_domain: int) -> DomainDataset:
     if name == 'PACS':
         return PACS(root_dir, test_domain=test_domain)
+    if name == 'camelyon17':
+        return Camelyon17(root_dir, test_domain=test_domain)
 
 
 """Insert new datasets below."""
