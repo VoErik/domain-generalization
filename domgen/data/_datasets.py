@@ -3,9 +3,10 @@ from collections import defaultdict
 import random
 
 import torch
+import torchvision
 from torch.utils.data import DataLoader, ConcatDataset, Subset
 from torchvision.datasets import ImageFolder
-from torchvision.transforms import transforms
+from domgen.augment import imagenet_transform
 from typing import Any
 
 """To add a new dataset, just create a class that inherits from `DomainDataset`."""
@@ -32,21 +33,25 @@ class DomainDataset(MultiDomainDataset):
             self,
             root: str,
             test_domain: int,
-            augment: Any,
+            augment: torchvision.transforms.Compose | Any = None,
             subset: float = None,
-    ):
+    ) -> None:
+        """
+        Base dataset class for a multi-domain dataset. Expects folder structure to be compatible with ImageFolder.
+        :param root: Dataset directory.
+        :param test_domain: Leave out domain.
+        :param augment: Augment that needs to be applied. Defaults to ImageNet transformation.
+        :param subset: Fraction of dataset that ought to be used. Keeps class and target distribution true to original
+         data. Defaults to None = use entire dataset.
+        :return: None
+        """
         super().__init__()
         self.domains = sorted([directory.name for directory in os.scandir(root) if directory.is_dir()])
         self.test_domain = test_domain
         self.subset = subset
         # base augment = ImageNet
         input_size = self.input_shape[-2], self.input_shape[-1]
-        transform = transforms.Compose([
-            transforms.Resize(input_size),
-            transforms.ToTensor(),
-            # transforms.Normalize(
-            # mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
+        transform = imagenet_transform(input_size=input_size)
         self.data = []
         for i, domain in enumerate(self.domains):
             if augment and (i != self.test_domain):
@@ -58,10 +63,20 @@ class DomainDataset(MultiDomainDataset):
             domain_dataset = ImageFolder(path, transform=domain_transform)
 
             if self.subset is not None:
-                num_samples = int(len(domain_dataset) * self.subset)
-                indices = list(range(len(domain_dataset)))
-                random.shuffle(indices)
-                subset_indices = indices[:num_samples]
+                # Ensures that target distribution remains true to original data
+                num_samples_per_class = {}
+                for target in set(domain_dataset.targets):
+                    class_count = domain_dataset.targets.count(target)
+                    num_samples_per_class[target] = int(class_count * self.subset)
+
+                class_indices = defaultdict(list)
+                for idx, target in enumerate(domain_dataset.targets):
+                    class_indices[target].append(idx)
+
+                subset_indices = []
+                for target, indices in class_indices.items():
+                    random.shuffle(indices)
+                    subset_indices.extend(indices[:num_samples_per_class[target]])
 
                 samples = [domain_dataset.samples[i] for i in subset_indices]
                 targets = [domain_dataset.targets[i] for i in subset_indices]
@@ -69,8 +84,7 @@ class DomainDataset(MultiDomainDataset):
                 domain_dataset.targets = targets
 
             self.data.append(domain_dataset)
-        for i, domain_data in enumerate(self.data):
-            print(f"Domain {i}: {len(domain_data)} samples")
+
         self.num_classes = len(self.data[-1].classes)
         self.classes = list(self.data[-1].classes)
         self.idx_to_class = dict(zip(range(self.num_classes), self.classes))
@@ -92,7 +106,7 @@ class DomainDataset(MultiDomainDataset):
     ) -> (DataLoader, DataLoader, DataLoader):
         """
         Generates DataLoaders for training and testing domains.
-        Parameters
+
         :param partition_size: Size of the training partition (default: 0.8). Validation size is equal to 1-training.
         :param batch_size: Size of the batch. (default: 32)
         :return: A tuple of DataLoaders for training, validation and testing.
@@ -109,7 +123,18 @@ class DomainDataset(MultiDomainDataset):
         return train_loader, val_loader, test_loader
 
 
-def get_dataset(name: str, root_dir: str, test_domain: int) -> DomainDataset:
+def get_dataset(
+        name: str,
+        root_dir: str,
+        test_domain: int
+) -> DomainDataset:
+    """
+    Gets a domain dataset from a given name.
+    :param name: Dataset name as string. Must be one of: PACS, camelyon17
+    :param root_dir: Path to datasets directory.
+    :param test_domain: Leave out domain.
+    :return:
+    """
     if name == 'PACS':
         return PACS(root_dir, test_domain=test_domain)
     if name == 'camelyon17':
