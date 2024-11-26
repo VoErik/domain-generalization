@@ -1,4 +1,4 @@
-from domgen.augment._sample import SampleAugmentation # for every object belonging to the public api
+from domgen.augment._transforms import imagenet_transform
+from domgen.augment._util import denormalize
 
-
-__all__ = ['SampleAugmentation']
+__all__ = ['imagenet_transform', 'denormalize']
