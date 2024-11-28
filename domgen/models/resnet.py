@@ -62,5 +62,17 @@ class ResNet(nn.Module):
         return ResNet(BasicBlock, [2, 2, 2, 2], num_classes)
 
     @staticmethod
+    def resnet34(num_classes: int):
+        return ResNet(BasicBlock, [3, 4, 6, 3], num_classes)
+
+    @staticmethod
     def resnet50(num_classes: int):
         return ResNet(Bottleneck, [3, 4, 6, 3], num_classes)
+
+    @staticmethod
+    def resnet101(num_classes: int):
+        return ResNet(Bottleneck, [3, 4, 23, 3], num_classes)
+
+    @staticmethod
+    def resnet152(num_classes: int):
+        return ResNet(Bottleneck, [3, 8, 36, 3], num_classes)
