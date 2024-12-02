@@ -63,11 +63,13 @@ def main():
         "num_epochs": 5,
     }
     tune_params_with_config = partial(tune_params, base_config=base_config)
+    trainable_with_gpu = tune.with_resources(tune_params_with_config, {"gpu": 0.25})
     tuner = tune.Tuner(
-        partial(tune_params_with_config),
+        trainable_with_gpu,
         tune_config=tune.TuneConfig(
-            num_samples=10,
+            num_samples=20,
             scheduler=ASHAScheduler(metric="mean_accuracy", mode="max"),
+            max_concurrent_trials=4
         ),
         param_space=search_space,
     )
@@ -76,6 +78,8 @@ def main():
     dfs = {result.path: result.metrics_dataframe for result in results}
     df = results.get_dataframe()
     df.to_csv("results.csv")
+    best = results.get_best_result(metric="mean_accuracy", mode="max")
+    print(best)
 
 
 if __name__ == '__main__':
