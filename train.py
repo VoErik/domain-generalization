@@ -1,5 +1,4 @@
 import csv
-from pprint import pprint
 
 import pandas as pd
 import torch
@@ -10,10 +9,9 @@ import argparse
 import torchvision
 from torchvision.models import ResNet18_Weights
 
-from domgen.data import PACS, DOMAIN_NAMES, get_dataset
-from domgen.models import get_model
+from domgen.data import DOMAIN_NAMES, get_dataset
 from domgen.eval import plot_accuracies, plot_training_curves
-from domgen.training import train_model
+from domgen.models._training import train_model
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,13 +36,13 @@ def main(args):
                    'best_validation_loss']
 
     for i in range(args.num_runs):
-
+        args.experiment_number = i
         logger.info(f'RUNNING EXPERIMENT {i + 1}/{args.num_runs}')
         logger.info(f'TRAINING ON {args.device}.\n')
         logger.info('STARTING...')
 
         for idx, domain in enumerate(domains):
-
+            args.domain_name = domain
             logger.info(f'LEAVE OUT {domain}.')
             logger.info(f'TRAINING FOR {args.epochs} EPOCHS.')
 
@@ -61,9 +59,7 @@ def main(args):
                                                          optimizer=optimizer,
                                                          train_loader=train,
                                                          val_loader=val,
-                                                         test_loader=test,
-                                                         test_domain=domain,
-                                                         i=i)
+                                                         test_loader=test,)
 
             logger.info(f'TEST LOSS: {test_metrics["Test Loss"]}')
             logger.info(f'TEST ACCURACY: {test_metrics["Test Accuracy"]}\n')
@@ -125,7 +121,8 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=5, help='number of epochs per split')
     parser.add_argument('--device', type=str, default='mps', help='Device to train on')
     parser.add_argument('--seed', type=int, default=42, help='random seed')
-    parser.add_argument('--experiment', type=str, default='exp', help='name of the experiment')
+    parser.add_argument('--experiment', type=str, default='exp', help='dir of the experiment')
+    parser.add_argument('--experiment_name', type=str, default='First', help='name of the experiment')
     parser.add_argument('--log_dir', type=str, default='experiments', help='log directory')
     parser.add_argument('--model', type=str, default='resnet18', help='base model')
     parser.add_argument('--pretrained', type=bool, default=False, help='use pretrained model')
