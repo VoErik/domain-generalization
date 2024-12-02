@@ -6,3 +6,4 @@ tensorboard
 pandas
 wilds
 gdown
+ray
