@@ -69,3 +69,29 @@ year={2018},
 publisher={IEEE}
 }
 ```
+### Adding datasets
+
+You can easily extend this repository by adding additional datasets. For that, you need to make sure that the dataset is placed in the `datasets` directory
+and follows the structure as shown (subdirectories for each domain containing the class directories):
+
+```console
+├── PACS
+│   ├── art_painting
+│   │   ├── dog
+│   │   ├── elephant
+│   │   ├── giraffe
+│   │   ├── guitar
+│   │   ├── horse
+│   │   ├── house
+│   │   └── person
+│   ├── cartoon
+│   │   ├── dog
+│   │   ├── elephant
+│   │   ├── giraffe
+│   │   ├── guitar
+│   │   ├── horse
+│   │   ├── house
+│   │   └── person
+...
+
+```
