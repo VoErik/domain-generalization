@@ -27,6 +27,7 @@ def train_model(
         val_loader: torch.utils.data.DataLoader,
         test_loader: torch.utils.data.DataLoader,
         tensorboard: bool = True,
+        device: str = 'cpu',
 ) -> Tuple[list[dict[str, float | int]], dict[str, float]]:
     """
     Training function. Runs the training and validation functions and tests the model afterwards on the holdout set.
@@ -38,29 +39,32 @@ def train_model(
     :param val_loader: Validation data loader.
     :param test_loader: Test data loader.
     :param tensorboard: Whether to log the run with tensorboard. Default: True.
+    :param device: Device to train on.
     :return: Training and testing metrics.
     """
 
     train_writer, test_writer = None, None
-    if tensorboard is not None:
+    if tensorboard:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         train_writer = SummaryWriter(
-            f'{logdir}/{args.experiment_name}/run_{args.experiment_number}/{args.domain_name}/train_{timestamp}')
+            f'{args.logdir}/{args.experiment}/run_{args.experiment_number}/{args.domain_name}/train_{timestamp}'
+        )
         test_writer = SummaryWriter(
-            f'{logdir}/{args.experiment_name}/run_{args.experiment_number}/{args.domain_name}/test_{timestamp}')
+            f'{args.logdir}/{args.experiment}/run_{args.experiment_number}/{args.domain_name}/test_{timestamp}'
+        )
 
     training_metrics = _training(model=model,
                                  optimizer=optimizer,
                                  criterion=criterion,
                                  num_epochs=args.epochs,
-                                 device=args.device,
+                                 device=device,
                                  train_loader=train_loader,
                                  val_loader=val_loader,
-                                 tb_writer=train_writer,)
+                                 tb_writer=train_writer, )
 
     test_metrics = test(model=model,
                         criterion=criterion,
-                        device=args.device,
+                        device=device,
                         test_loader=test_loader,
                         tb_writer=test_writer)
 
@@ -72,7 +76,7 @@ def train_epoch(
         optimizer: torch.optim.Optimizer,
         criterion: torch.nn.Module,
         train_loader: torch.utils.data.DataLoader,
-        device: torch.device,
+        device: str,
         tb_writer: SummaryWriter = None,
         epoch: int = None
 ) -> Tuple[float, float]:
@@ -130,8 +134,8 @@ def validate(
         model: torch.nn.Module,
         val_loader: torch.utils.data.DataLoader,
         criterion: torch.nn.Module,
-        device: torch.device,
-        tb_writer: SummaryWriter=None,
+        device: str,
+        tb_writer: SummaryWriter = None,
 ) -> Tuple[float, float]:
     """
     Runs the model on the validation set and calculates loss and accuracy across all batches.
@@ -179,7 +183,7 @@ def test(
         model: torch.nn.Module,
         test_loader: torch.utils.data.DataLoader,
         criterion: torch.nn.Module,
-        device: torch.device,
+        device: str,
         tb_writer: SummaryWriter = None,
 ) -> Dict[str, float]:
     """
