@@ -1,0 +1,7 @@
+dataset: PACS
+datadir: datasets
+num_classes: 7
+test_domain: 0
+model: densenet121
+num_epochs: 10
+pretrained: True

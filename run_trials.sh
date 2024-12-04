@@ -1,7 +1,7 @@
 #!/bin/bash
 
 HP_CONFIG="config/hp_search_space.yaml"
-DATA_CONFIG_DIR="config/base/"
+DATA_CONFIG_DIR="config/base/"   # config/base/trainiertesModell
 SCRIPT="domgen/tune_hps.py"
 
 for DATA_CONFIG in "$DATA_CONFIG_DIR"/*.yaml; do
