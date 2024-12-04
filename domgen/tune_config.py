@@ -17,6 +17,9 @@ import tempfile
 import torch
 import yaml
 
+def tune_augments(augment_config, base_config):
+    pass
+
 
 def tune_params(hp_config, base_config):
     device = get_device()
@@ -47,7 +50,7 @@ def tune_params(hp_config, base_config):
             train.report({"mean_accuracy": acc, "val_loss": val_loss},  checkpoint=checkpoint)
 
 
-def main(conf) -> None:
+def tune_hyperparameters(conf) -> None:
     with open(conf.hp_config, "r") as f:
         search_space = yaml.safe_load(f)
 
@@ -95,11 +98,18 @@ def main(conf) -> None:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--mode', choices=['hp', 'augment'])
     parser.add_argument("--hp_config", default="./config/hp/hp_search_space.yaml")
     parser.add_argument("--data_config", default="./config/base/pacs-resnet18-pretrained-td=0.yaml")
+    parser.add_argument("--augment_config", default="")
     parser.add_argument("--num_samples", default=20, type=int)
     parser.add_argument("--max_concurrent", default=5, type=int)
     parser.add_argument("--trial_dir", default="./experiments/trials", type=str)
     parser.add_argument("--num_gpu", default=0.5, type=float)
     args = parser.parse_args()
-    main(args)
+
+    if args.mode == 'hp':
+        tune_hyperparameters(args)
+    if args.mode == 'augment':
+        tune_hyperparameters(args)
+
