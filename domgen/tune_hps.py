@@ -96,7 +96,7 @@ def main(conf) -> None:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--hp_config", default="./config/hp/hp_search_space.yaml")
-    parser.add_argument("--data_config", default="./config/base/pacs-resnet18-pretrained-td=0.yaml")
+    parser.add_argument("--data_config", default="./config/base/pacs-resnet18-pretrainedT-td=0.yaml")
     parser.add_argument("--num_samples", default=20, type=int)
     parser.add_argument("--max_concurrent", default=5, type=int)
     parser.add_argument("--trial_dir", default="./experiments/trials", type=str)
