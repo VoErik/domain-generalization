@@ -4,3 +4,4 @@ num_classes: 7
 test_domain: 0
 model: resnet18
 num_epochs: 10
+pretrained: True
