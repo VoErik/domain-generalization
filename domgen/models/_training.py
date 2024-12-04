@@ -47,10 +47,10 @@ def train_model(
     if tensorboard:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         train_writer = SummaryWriter(
-            f'{args.logdir}/{args.experiment}/run_{args.experiment_number}/{args.domain_name}/train_{timestamp}'
+            f'{args.log_dir}/{args.experiment}/run_{args.experiment_number}/{args.domain_name}/train_{timestamp}'
         )
         test_writer = SummaryWriter(
-            f'{args.logdir}/{args.experiment}/run_{args.experiment_number}/{args.domain_name}/test_{timestamp}'
+            f'{args.log_dir}/{args.experiment}/run_{args.experiment_number}/{args.domain_name}/test_{timestamp}'
         )
 
     training_metrics = _training(model=model,
