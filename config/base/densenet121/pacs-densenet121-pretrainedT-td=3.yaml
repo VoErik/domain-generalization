@@ -2,5 +2,6 @@ dataset: PACS
 datadir: datasets
 num_classes: 7
 test_domain: 3
-model: resnet18
+model: densenet121
 num_epochs: 10
+pretrained: True
