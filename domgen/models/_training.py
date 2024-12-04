@@ -1,9 +1,11 @@
 from datetime import datetime
 from typing import Tuple, List, Dict
 import torch
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import logging
+from ._utils import EarlyStopping
 
 # remember to set tensorboard logdir to experiments
 logdir = 'experiments'
@@ -53,7 +55,8 @@ def train_model(
             f'{args.log_dir}/{args.experiment}/run_{args.experiment_number}/{args.domain_name}/test_{timestamp}'
         )
 
-    training_metrics = _training(model=model,
+    training_metrics = _training(args,
+                                 model=model,
                                  optimizer=optimizer,
                                  criterion=criterion,
                                  num_epochs=args.epochs,
@@ -72,6 +75,7 @@ def train_model(
 
 
 def train_epoch(
+        args,
         model: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
         criterion: torch.nn.Module,
@@ -82,6 +86,7 @@ def train_epoch(
 ) -> Tuple[float, float]:
     """
     Runs a training epoch.
+    :param args: Namespace arguments.
     :param model: Instance of nn.Module
     :param optimizer: Optimizing algorithm.
     :param criterion: Loss function.
@@ -96,6 +101,10 @@ def train_epoch(
     correct_predictions = 0
     total_predictions = 0
 
+    scheduler = None
+    if args.use_scheduling:
+        scheduler = ReduceLROnPlateau(optimizer, patience=args.patience)
+
     with tqdm(train_loader, unit='batch') as batch:
         for i, (inputs, labels) in enumerate(batch):
             batch.set_description(f'Epoch {epoch}')
@@ -107,6 +116,8 @@ def train_epoch(
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
+            if scheduler:
+                scheduler.step(loss)
 
             predictions = outputs.argmax(dim=1, keepdim=True).squeeze()
             correct = (predictions == labels).sum().item()
@@ -228,6 +239,7 @@ def test(
 
 
 def _training(
+        args,
         model: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
         criterion,
@@ -235,7 +247,7 @@ def _training(
         device: str,
         train_loader,
         val_loader,
-        tb_writer=None
+        tb_writer=None,
 ) -> List[dict[str, float | int]]:
     """Training loop. Trains the model and evaluates on the validation set.
     :param model: Model to train.
@@ -249,12 +261,18 @@ def _training(
     """
 
     best_vloss = float('inf')
+    best_vacc = 0.0
     metrics_summary = []
+
+    early_stopping = None
+    if args.use_early_stopping:
+        early_stopping= EarlyStopping(patience=args.patience)
 
     for epoch in range(num_epochs):
         logger.info(f'EPOCH {epoch + 1}:')
 
         avg_loss, avg_accuracy = train_epoch(
+            args=args,
             epoch=epoch,
             tb_writer=tb_writer,
             model=model,
@@ -283,6 +301,8 @@ def _training(
 
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
+        if avg_vaccuracy > best_vacc:
+            best_vacc = avg_vaccuracy
 
         metrics = {
             'epoch': epoch,
@@ -290,8 +310,12 @@ def _training(
             'avg_validation_loss': avg_vloss,
             'avg_training_accuracy': avg_accuracy,
             'avg_validation_accuracy': avg_vaccuracy,
+            'best_validation_accuracy': best_vacc,
             'best_validation_loss': best_vloss
         }
         metrics_summary.append(metrics)
+
+        if early_stopping and early_stopping.stop:
+            break
 
     return metrics_summary
