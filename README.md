@@ -5,6 +5,48 @@ From `root` run:
 python -m pip install -e .
 ```
 
+## Hyperparameters
+
+We ran a basic hyperparameter search for each leave-out split using `raytune`. For each trial run we sampled 30 times and trained for 10 (pretrained) or 100 (new initialization) epochs.
+
+| Model            | LR   | Batch Size | Momentum | Weight Decay | Optimizer | Betas | Eps  | Nesterov | Acc  |
+|------------------|------|------------|----------|--------------|-----------|-------|------|----------|------|
+| Resnet18 (pt)    | None | None       | None     | None         | None      | None  | None | None     | None |
+| Resnet50 (pt)    | None | None       | None     | None         | None      | None  | None | None     | None |
+| Resnet18         | None | None       | None     | None         | None      | None  | None | None     | None |
+| Resnet50         | None | None       | None     | None         | None      | None  | None | None     | None |
+| Densenet121 (pt) | None | None       | None     | None         | None      | None  | None | None     | None |
+| Densenet201 (pt) | None | None       | None     | None         | None      | None  | None | None     | None |
+| Densenet121      | None | None       | None     | None         | None      | None  | None | None     | None |
+| Densenet201      | None | None       | None     | None         | None      | None  | None | None     | None |
+*\* = Not relevant for this configuration.*
+*(pt) = pre-trained (ImageNet weights).*
+
+For the criterion we chose `CrossEntropy` for all runs. 
+
+To run a trial run for one model-config simply run:
+
+```console
+python tune_config --data_config [PATH/TO/CONFIG.yaml] --hp_config [PATH/TO/CONFIG.yaml]
+```
+
+To run a trial sweep for all models of a certain class (e.g. pretrained `resnet18` -> `resnet18-pretrained`), run:
+
+```console
+sh run_trials.sh [modelclass]
+```
+on Unix-based systems or
+
+```console
+run_trials.bat [modelclass]
+```
+on Windows. For a full sweep of all models, run:
+
+```console
+hp_full_sweep.ps1
+```
+
+This will train a total of (num_models * num_domains * num_samples) => 8 * 4 * 30 = 960 models.
 ## Data
 
 We ran our experiments on two common domain generalization benchmarks: `PACS` and `Camelyon17`.
