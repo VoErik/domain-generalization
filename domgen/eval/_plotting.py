@@ -16,11 +16,11 @@ def plot_accuracies(path: str, save: bool = True, cmap: str = 'cividis') -> None
 
     df = pd.read_csv(path)
 
-    avg_accuracy = df["Average Accuracy"].mean()
-    avg_worst_case = df["Worst Case Accuracy"].mean()
-    avg_best_case = df["Best Case Accuracy"].mean()
+    avg_accuracy = df["avg_acc"].mean()
+    avg_worst_case = df["worst_case_acc"].mean()
+    avg_best_case = df["best_case_acc"].mean()
 
-    features = ["Average Accuracy", "Worst Case Accuracy", "Best Case Accuracy"]
+    features = ["avg_acc", "worst_case_acc", "best_case_acc"]
     x = range(len(features))
 
     fig, ax = plt.subplots(figsize=(10, 6))
