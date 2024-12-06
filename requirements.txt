@@ -7,7 +7,6 @@ pandas~=2.2.3
 wilds~=2.0.0
 gdown~=5.2.0
 ray~=2.39.0
-domgen~=0.0.1
 matplotlib~=3.9.2
 numpy~=2.1.2
 PyYAML~=6.0.2
