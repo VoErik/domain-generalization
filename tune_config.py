@@ -15,7 +15,7 @@ from functools import partial
 import os
 import tempfile
 import torch
-import yaml
+from ruamel.yaml import YAML
 
 def tune_augments(augment_config, base_config):
     pass
@@ -23,6 +23,8 @@ def tune_augments(augment_config, base_config):
 
 def tune_params(hp_config, base_config):
     device = get_device()
+    args.use_scheduling = False
+    args.silent = True
     model = get_model(model_name=base_config["model"], num_classes=base_config["num_classes"]).to(device)
     criterion = get_criterion(hp_config["criterion"])
     optimizer = get_optimizer(hp_config["optimizer"], model.parameters(),
@@ -35,8 +37,8 @@ def tune_params(hp_config, base_config):
     train_loader, val_loader, _ = dataset.generate_loaders(batch_size=hp_config["batch_size"])
 
     for i in range(base_config["num_epochs"]):
-        train_epoch(model, optimizer, criterion, train_loader, device)
-        val_loss, acc = validate(model, val_loader, criterion, device)
+        train_epoch(args=args, model=model, optimizer=optimizer, criterion=criterion, train_loader=train_loader, device=device)
+        val_loss, acc = validate(args, model, val_loader, criterion, device)
 
         with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
             checkpoint = None
@@ -51,20 +53,21 @@ def tune_params(hp_config, base_config):
 
 
 def tune_hyperparameters(conf) -> None:
+    yaml = YAML(typ="safe")
     with open(conf.hp_config, "r") as f:
-        search_space = yaml.safe_load(f)
+        search_space = yaml.load(f)
 
     with open(conf.data_config, "r") as f:
-        base_config = yaml.safe_load(f)
+        base_config = yaml.load(f)
 
-    trial_dir = conf.trial_dir
+    trial_dir = f'{os.path.abspath(conf.trial_dir)}'
     trial_name = f'{base_config["model"]}-{base_config["test_domain"]}-{datetime.now().strftime('%Y%m%d_%H%M%S')}'
 
     search_space = {
         "lr": tune.choice(search_space["lr"]),
-        "momentum": tune.uniform(search_space["momentum"]["min"], search_space["momentum"]["max"]),
+        "momentum": tune.loguniform(float(search_space["momentum"]["min"]), float(search_space["momentum"]["max"])),
         "batch_size": tune.choice(search_space["batch_size"]),
-        "weight_decay": tune.uniform(search_space["weight_decay"]["min"], search_space["weight_decay"]["max"]),
+        "weight_decay": tune.loguniform(float(search_space["weight_decay"]["min"]), float(search_space["weight_decay"]["max"])),
         "criterion": tune.choice(search_space["criterion"]),
         "optimizer": tune.choice(search_space["optimizer"]),
         "betas": tune.choice(search_space["betas"]),
@@ -91,7 +94,7 @@ def tune_hyperparameters(conf) -> None:
     results = tuner.fit()
 
     df = results.get_dataframe()
-    df.to_csv(f"{trial_dir}/{trial_name}/results.csv")
+    df.to_csv(f"{conf.trial_dir}/{trial_name}/results.csv")
     best = results.get_best_result(metric="mean_accuracy", mode="max")
     print(best)
 
@@ -99,13 +102,13 @@ def tune_hyperparameters(conf) -> None:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--mode', choices=['hp', 'augment'])
-    parser.add_argument("--hp_config", default="./config/hp/hp_search_space.yaml")
+    parser.add_argument("--hp_config", default="./config/hp_search_space.yaml")
     parser.add_argument("--augment_config", default="")
-    parser.add_argument("--data_config", default="./config/base/pacs-resnet18-pretrainedT-td=0.yaml")
+    parser.add_argument("--data_config", default="./config/base/resnet18/pacs-resnet18-pretrainedT-td=0.yaml")
     parser.add_argument("--num_samples", default=20, type=int)
-    parser.add_argument("--max_concurrent", default=5, type=int)
+    parser.add_argument("--max_concurrent", default=20, type=int)
     parser.add_argument("--trial_dir", default="./experiments/trials", type=str)
-    parser.add_argument("--num_gpu", default=0.5, type=float)
+    parser.add_argument("--num_gpu", default=1, type=float)
     args = parser.parse_args()
 
     if args.mode == 'hp':
