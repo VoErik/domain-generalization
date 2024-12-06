@@ -162,6 +162,7 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=str, default='resnet18', help='base model')
     parser.add_argument('--pretrained', action='store_true', default=False, help='use pretrained model')
     parser.add_argument('--num_runs', type=int, default=10, help='Number of runs per experiment')
+    parser.add_argument('--silent', action='store_true', default=False, help='silent mode')
     args = parser.parse_args()
 
     main(args)

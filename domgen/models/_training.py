@@ -65,7 +65,8 @@ def train_model(
                                  val_loader=val_loader,
                                  tb_writer=train_writer, )
 
-    test_metrics = test(model=model,
+    test_metrics = test(args=args,
+                        model=model,
                         criterion=criterion,
                         device=device,
                         test_loader=test_loader,
@@ -105,9 +106,10 @@ def train_epoch(
     if args.use_scheduling:
         scheduler = ReduceLROnPlateau(optimizer, patience=args.patience)
 
-    with tqdm(train_loader, unit='batch') as batch:
+    with tqdm(train_loader, unit='batch', disable=args.silent) as batch:
         for i, (inputs, labels) in enumerate(batch):
-            batch.set_description(f'Epoch {epoch}')
+            if not args.silent:
+                batch.set_description(f'Epoch {epoch}')
             inputs, labels = inputs.to(device), labels.to(device)
 
             optimizer.zero_grad()
@@ -127,7 +129,8 @@ def train_epoch(
             running_loss += loss.item()
             denominator = len(predictions) if predictions.dim() != 0 else 1
             accuracy = correct / denominator
-            batch.set_postfix(loss=loss.item(), accuracy=100. * accuracy)
+            if not args.silent:
+                batch.set_postfix(loss=loss.item(), accuracy=100. * accuracy)
 
     avg_loss = running_loss / len(train_loader)
     avg_accuracy = 100. * correct_predictions / total_predictions
@@ -142,6 +145,7 @@ def train_epoch(
 
 
 def validate(
+        args,
         model: torch.nn.Module,
         val_loader: torch.utils.data.DataLoader,
         criterion: torch.nn.Module,
@@ -162,7 +166,7 @@ def validate(
     correct_predictions = 0
     total_predictions = 0
 
-    with tqdm(val_loader, unit='batch', desc='Validation') as batch:
+    with tqdm(val_loader, unit='batch', desc='Validation', disable=args.silent) as batch:
         for inputs, labels in batch:
             inputs, labels = inputs.to(device), labels.to(device)
 
@@ -176,7 +180,8 @@ def validate(
             total_predictions += labels.size(0)
 
             batch_accuracy = correct_predictions / total_predictions
-            batch.set_postfix(loss=loss.item(), accuracy=100. * batch_accuracy)
+            if not args.silent:
+                batch.set_postfix(loss=loss.item(), accuracy=100. * batch_accuracy)
 
     avg_loss = val_loss / total_predictions
     avg_accuracy = 100. * correct_predictions / total_predictions
@@ -191,6 +196,7 @@ def validate(
 
 
 def test(
+        args,
         model: torch.nn.Module,
         test_loader: torch.utils.data.DataLoader,
         criterion: torch.nn.Module,
@@ -211,7 +217,7 @@ def test(
     correct_predictions = 0
     total_predictions = 0
 
-    with tqdm(test_loader, unit='batch', desc='Testing') as batch:
+    with tqdm(test_loader, unit='batch', desc='Testing', disable=args.silent) as batch:
         for inputs, labels in batch:
             inputs, labels = inputs.to(device), labels.to(device)
 
@@ -225,7 +231,8 @@ def test(
             total_predictions += labels.size(0)
 
             batch_accuracy = correct_predictions / total_predictions
-            batch.set_postfix(loss=loss.item(), accuracy=100. * batch_accuracy)
+            if not args.silent:
+                batch.set_postfix(loss=loss.item(), accuracy=100. * batch_accuracy)
 
     avg_loss = test_loss / total_predictions
     avg_accuracy = 100. * correct_predictions / total_predictions
@@ -283,6 +290,7 @@ def _training(
         )
 
         avg_vloss, avg_vaccuracy = validate(
+            args=args,
             tb_writer=tb_writer,
             model=model,
             criterion=criterion,
