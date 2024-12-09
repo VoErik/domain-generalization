@@ -9,17 +9,17 @@ python -m pip install -e .
 
 We ran a basic hyperparameter search for each leave-out split using `raytune`. For each trial run we sampled 30 times and trained for 10 (pretrained) or 100 (new initialization) epochs.
 
-| Model            | LR   | Batch Size | Momentum | Weight Decay | Optimizer | Betas | Eps  | Nesterov | Acc  |
-|------------------|------|------------|----------|--------------|-----------|-------|------|----------|------|
-| Resnet18 (pt)    | None | None       | None     | None         | None      | None  | None | None     | None |
-| Resnet50 (pt)    | None | None       | None     | None         | None      | None  | None | None     | None |
-| Resnet18         | None | None       | None     | None         | None      | None  | None | None     | None |
-| Resnet50         | None | None       | None     | None         | None      | None  | None | None     | None |
-| Densenet121 (pt) | None | None       | None     | None         | None      | None  | None | None     | None |
-| Densenet201 (pt) | None | None       | None     | None         | None      | None  | None | None     | None |
-| Densenet121      | None | None       | None     | None         | None      | None  | None | None     | None |
-| Densenet201      | None | None       | None     | None         | None      | None  | None | None     | None |
-*\* = Not relevant for this configuration.*
+| Model            | LR     | Batch Size | Momentum | Weight Decay | Optimizer | Betas | Eps  | Nesterov | Acc  |
+|------------------|--------|------------|----------|--------------|-----------|-------|------|----------|------|
+| Resnet18 (pt)    | None   | None       | None     | None         | None      | None  | None | None     | None |
+| Resnet50 (pt)    | None   | None       | None     | None         | None      | None  | None | None     | None |
+| Resnet18         | None   | None       | None     | None         | None      | None  | None | None     | None |
+| Resnet50         | None   | None       | None     | None         | None      | None  | None | None     | None |
+| Densenet121 (pt) | 0.0001 | 16         | 0.2      | None         | adam      | None  | 1e7  | True     | None |
+| Densenet201 (pt) | None   | None       | None     | None         | None      | None  | None | None     | None |
+| Densenet121      | None   | None       | None     | None         | None      | None  | None | None     | None |
+| Densenet201      | None   | None       | None     | None         | None      | None  | None | None     | None |
+*\* = Not relevant for this configuration.*<br>
 *(pt) = pre-trained (ImageNet weights).*
 
 For the criterion we chose `CrossEntropy` for all runs. 
