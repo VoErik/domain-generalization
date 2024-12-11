@@ -1,0 +1,30 @@
+# Model and dataset
+model: "densenet121"
+dataset: "PACS"
+
+# Training hyperparameters
+lr: 1e-4
+batch_size: 64
+momentum: None
+weight_decay: 0
+epochs: 10
+eps: 1e-8
+betas: [0.99, 0.999]
+
+# Optimization and loss
+criterion: "cross_entropy"
+optimizer: "adam"
+nesterov: false
+
+# Early stopping and scheduling
+use_early_stopping: true
+patience: 5
+use_scheduling: false
+
+# Device and pretraining
+device: "cuda"
+pretrained: true
+
+# Experiment details
+experiment: "densenet121-pt-baseline-pacs"
+num_runs: 10
