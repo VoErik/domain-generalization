@@ -19,7 +19,7 @@ def get_optimizer(
     optimizer_name = optimizer_name.lower()
     optimizer_args = {
         'sgd': ['lr', 'momentum', 'weight_decay', 'nesterov'],
-        'adam': ['lr', 'betas', 'eps', 'weight_decay', 'amsgrad'],
+        'adam': ['lr', 'betas', 'eps'],
         'adamw': ['lr', 'betas', 'eps', 'weight_decay', 'amsgrad'],
     }
 
