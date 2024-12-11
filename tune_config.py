@@ -28,7 +28,9 @@ def tune_params(hp_config, base_config):
     model = get_model(model_name=base_config["model"], num_classes=base_config["num_classes"]).to(device)
     criterion = get_criterion(hp_config["criterion"])
     optimizer = get_optimizer(hp_config["optimizer"], model.parameters(),
-                              lr=hp_config["lr"], momentum=hp_config["momentum"])
+                              lr=hp_config["lr"], momentum=hp_config["momentum"],
+                              betas=hp_config["betas"], nesterov=hp_config["nesterov"],
+                              weight_decay=hp_config["weight_decay"], eps=hp_config["eps"])
     dataset = get_dataset(
         root_dir=base_config["datadir"],
         name=base_config["dataset"],
