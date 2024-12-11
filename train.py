@@ -4,6 +4,7 @@ import torch
 import logging
 import argparse
 import pandas as pd
+from ruamel.yaml import YAML
 
 from domgen.data import DOMAIN_NAMES, get_dataset
 from domgen.eval import plot_accuracies, plot_training_curves
@@ -24,6 +25,30 @@ def main(args):
         torch.manual_seed(args.seed)
         torch.cuda.manual_seed(args.seed)
         torch.cuda.manual_seed_all(args.seed)
+
+    # override default args when config file is provided
+    if args.config:
+        yaml = YAML(typ="safe")
+        with open(args.config, "r") as f:
+            conf = yaml.load(f)
+        args.model = conf["model"]
+        args.lr = conf['lr']
+        args.batch_size = conf['batch_size']
+        args.momentum = conf['momentum']
+        args.weight_decay = conf['weight_decay']
+        args.epochs = conf['epochs']
+        args.eps = conf['eps']
+        args.betas = conf['betas']
+        args.criterion = conf['criterion']
+        args.optimizer = conf['optimizer']
+        args.nesterov = conf['nesterov']
+        args.use_early_stopping = conf['use_early_stopping']
+        args.use_scheduling = conf['use_scheduling']
+        args.pretrained = conf['pretrained']
+        args.experiment = conf['experiment']
+        args.patience = conf['patience']
+        args.num_runs = conf['num_runs']
+        args.dataset = conf['dataset']
 
     if args.device:
         device = args.device
@@ -75,7 +100,11 @@ def main(args):
                 optimizer_name=args.optimizer,
                 model_parameters=model.parameters(),
                 lr=args.lr,
-                momentum=args.momentum
+                momentum=args.momentum,
+                betas=args.betas,
+                weight_decay=args.weight_decay,
+                nesterov=args.nesterov,
+                eps=args.eps,
             )
 
             training_metrics, test_metrics = train_model(
@@ -137,8 +166,8 @@ def main(args):
     logger.info(f'Saving plots to {args.log_dir}/{args.experiment}/plots/')
 
     # create plots
-    plot_training_curves(f'{args.log_dir}/{args.experiment}/')
-    plot_accuracies(f'{args.log_dir}/{args.experiment}/results.csv')
+    plot_training_curves(f'{args.log_dir}/{args.experiment}/', show=False)
+    plot_accuracies(f'{args.log_dir}/{args.experiment}/results.csv', show=False)
 
 
 if __name__ == '__main__':
@@ -154,7 +183,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
     parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
     parser.add_argument('--epochs', type=int, default=5, help='number of epochs per split')
-    parser.add_argument('--device', type=str, default='mps', help='Device to train on')
+    parser.add_argument('--device', type=str, help='Device to train on')
     parser.add_argument('--seed', type=int, default=42, help='random seed')
     parser.add_argument('--deterministic', action='store_true', default=False, help='use seed or not')
     parser.add_argument('--experiment', type=str, default='exp', help='dir of the experiment')
@@ -163,6 +192,7 @@ if __name__ == '__main__':
     parser.add_argument('--pretrained', action='store_true', default=False, help='use pretrained model')
     parser.add_argument('--num_runs', type=int, default=10, help='Number of runs per experiment')
     parser.add_argument('--silent', action='store_true', default=False, help='silent mode')
+    parser.add_argument('--config', type=str, default=None, help='config file')
     args = parser.parse_args()
 
     main(args)
