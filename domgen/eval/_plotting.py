@@ -7,7 +7,12 @@ from typing import Dict, List, Tuple
 from parcoords import plot_parcoords
 
 
-def plot_accuracies(path: str, save: bool = True, cmap: str = 'cividis') -> None:
+def plot_accuracies(
+        path: str,
+        save: bool = True,
+        cmap: str = 'cividis',
+        show: bool = True,
+) -> None:
     """Creates bar plots of accuracies across domains for one experiment.
     :param path: path to csv file.
     :param save: whether to save the figure. Default is True.
@@ -66,8 +71,8 @@ def plot_accuracies(path: str, save: bool = True, cmap: str = 'cividis') -> None
 
     if save:
         _save_plot(path, fig, name='accuracies')
-
-    plt.show()
+    if show:
+        plt.show()
 
 
 def _load_run_data(base_dir: str) -> Dict[str, List]:
@@ -89,11 +94,14 @@ def _load_run_data(base_dir: str) -> Dict[str, List]:
     return domain_data
 
 
-def _plot_metric_curves(run_data: Dict[str, List],
-                        metric_name: str,
-                        ylabel: str,
-                        title: str,
-                        save_path: str = None):
+def _plot_metric_curves(
+        run_data: Dict[str, List],
+        metric_name: str,
+        ylabel: str,
+        title: str,
+        save_path: str = None,
+        show: bool = True,
+) -> None:
     """Plot the metric curves for each domain with an average line and min-max margin.
     :param run_data: nested dictionary with run and domain data.
     :param metric_name: name of the metric to plot.
@@ -136,15 +144,19 @@ def _plot_metric_curves(run_data: Dict[str, List],
         if save_path:
             save_name = f'{domain}_{metric_name}_plot'
             _save_plot(save_path, fig, save_name)
-        plt.show()
+        if show:
+            plt.show()
 
 
 # TODO: integrate into _plot_metric_curves function
-def _plot_all_domain_averages(run_data: Dict[str, List],
-                              metric_name: str,
-                              ylabel: str,
-                              title: str,
-                              save_path=None):
+def _plot_all_domain_averages(
+        run_data: Dict[str, List],
+        metric_name: str,
+        ylabel: str,
+        title: str,
+        save_path=None,
+        show: bool = True,
+):
     """Plot the average curves for each domain in a single plot, plus an overall average curve.
     :param run_data: nested dictionary with run and domain data.
     :param metric_name: name of the metric to plot.
@@ -181,10 +193,15 @@ def _plot_all_domain_averages(run_data: Dict[str, List],
     if save_path:
         save_name = f'global_{metric_name}_plot'
         _save_plot(save_path, fig, save_name)
-    plt.show()
+    if show:
+        plt.show()
 
 
-def plot_training_curves(base_dir: str):
+def plot_training_curves(
+        base_dir: str,
+        show: bool = True,
+        save_path: str = None
+) -> None:
     """Plot the training curves for each domain.
     :param base_dir: path to experiment directory.
     :return: None"""
@@ -198,13 +215,19 @@ def plot_training_curves(base_dir: str):
     ]
 
     for metric_name, ylabel, title in metrics:
-        _plot_metric_curves(run_data, metric_name, ylabel, title,
-                            save_path=base_dir)
-        _plot_all_domain_averages(run_data, metric_name, ylabel, title,
-                                  save_path=base_dir)
+        _plot_metric_curves(
+            run_data, metric_name, ylabel, title, save_path=base_dir, show=show
+        )
+        _plot_all_domain_averages(
+            run_data, metric_name, ylabel, title, save_path=base_dir, show=show
+        )
 
 
-def _save_plot(path: str, fig: plt.Figure, name: str) -> None:
+def _save_plot(
+        path: str,
+        fig: plt.Figure,
+        name: str
+) -> None:
     """Creates plot dir and saves the figure.
     :param path: path to save the figure.
     :param fig: matplotlib figure.
@@ -304,7 +327,8 @@ def find_common_configs(
         domain: pd.DataFrame,
         tolerance: float = 0.01,
         fields: List[str] = None,
-        top_n: int = 5
+        top_n: int = 5,
+        filter_optim: str = None,
 ) -> List[str]:
     """
     Searches for common hyperparameter configurations. Expects a pd.Dataframe containing the configurations over all domains of a model.
@@ -336,6 +360,22 @@ def find_common_configs(
     def is_approx_equal(value1, value2, tolerance):
         return abs(value1 - value2) <= tolerance
 
+    # ugly, ugly, ugly! infer columns and their types automatically.
+    # but then we also need to pass which cols to ignore!
+    if filter_optim == 'adam':
+        categorical_columns = ['config/betas']
+        numerical_columns = ['config/lr', 'config/batch_size', 'config/eps']
+    elif filter_optim == 'adamw':
+        categorical_columns = ['config/betas']
+        numerical_columns = ['config/lr', 'config/batch_size', 'config/weight_decay', 'config/eps']
+
+    elif filter_optim == 'sgd':
+        categorical_columns = ['config/nesterov']
+        numerical_columns = ['config/lr', 'config/momentum', 'config/weight_decay']
+    else:
+        categorical_columns = ['config/optimizer', 'config/betas', 'config/nesterov']
+        numerical_columns = ['config/lr', 'config/momentum', 'config/weight_decay', 'config/eps']
+
     for domain_name, domain_data in top_n_by_domain.items():
         domain_top_configs = domain_data.head(5)
 
@@ -348,11 +388,8 @@ def find_common_configs(
                 other_top_configs = other_data.head(5)
                 match_found = False
                 for idx2, config2 in other_top_configs.iterrows():
-                    # Todo: find categorical + numerical cols automatically. Low prio.
-                    categorical_columns = ['config/optimizer', 'config/betas', 'config/nesterov']
                     categorical_match = all(config1[col] == config2[col] for col in categorical_columns)
 
-                    numerical_columns = ['config/lr', 'config/momentum', 'config/weight_decay', 'config/eps']
                     numerical_match = all(
                         is_approx_equal(config1[col], config2[col], tolerance) for col in numerical_columns
                     )
