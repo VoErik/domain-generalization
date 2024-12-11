@@ -7,6 +7,7 @@ momentum:
   min: 0.1
   max: 0.95
 batch_size:
+  - 8
   - 16
   - 32
   - 64

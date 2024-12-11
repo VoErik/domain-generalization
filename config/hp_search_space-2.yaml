@@ -1,0 +1,12 @@
+lr:
+  - 1e-6
+  - 1e-5
+  - 1e-4
+  - 1e-3
+batch_size:
+  - 32
+  - 64
+criterion:
+  - "cross_entropy"
+optimizer:
+  - "adamw"
