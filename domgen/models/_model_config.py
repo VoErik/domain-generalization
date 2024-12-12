@@ -78,31 +78,33 @@ def get_model(
     :param pretrained: Whether to load pretrained weights.
     :returns: model: PyTorch model object.
     """
-    model_name = model_name.lower()
 
     models_dict = {
         # ResNet Variants
-        'resnet18': models.resnet18,
-        'resnet34': models.resnet34,
-        'resnet50': models.resnet50,
-        'resnet101': models.resnet101,
-        'resnet152': models.resnet152,
+        'ResNet18': models.resnet18,
+        'ResNet34': models.resnet34,
+        'ResNet50': models.resnet50,
+        'ResNet101': models.resnet101,
+        'ResNet152': models.resnet152,
         # DenseNet Variants
-        'densenet121': models.densenet121,
-        'densenet161': models.densenet161,
-        'densenet169': models.densenet169,
-        'densenet201': models.densenet201,
+        'DenseNet121': models.densenet121,
+        'DenseNet161': models.densenet161,
+        'DenseNet169': models.densenet169,
+        'DenseNet201': models.densenet201,
     }
 
     if model_name not in models_dict:
         raise ValueError(f"Model '{model_name}' not recognized. "
                          f"Available options: {list(models_dict.keys())}")
 
-    model = models_dict[model_name](pretrained=pretrained)
+    if pretrained:
+        model = models_dict[model_name](weights='DEFAULT')
+    else:
+        model = models_dict[model_name]()
 
-    if 'resnet' in model_name:
+    if 'ResNet' in model_name:
         model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
-    elif 'densenet' in model_name:
+    elif 'DenseNet' in model_name:
         model.classifier = torch.nn.Linear(model.classifier.in_features, num_classes)
     else:
         raise ValueError(f"Model architecture not supported: {model_name}")
