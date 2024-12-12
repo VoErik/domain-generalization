@@ -2,8 +2,10 @@ import os
 from collections import defaultdict
 import random
 
+import numpy as np
 import torch
 import torchvision
+from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, ConcatDataset, Subset
 from torchvision.datasets import ImageFolder
 from domgen.augment import imagenet_transform
@@ -102,22 +104,39 @@ class DomainDataset(MultiDomainDataset):
     def generate_loaders(
             self,
             batch_size: int = 32,
-            partition_size: float = 0.8,
+            test_size: float = 0.2,
+            stratify: bool = True,
     ) -> (DataLoader, DataLoader, DataLoader):
         """
         Generates DataLoaders for training and testing domains.
 
-        :param partition_size: Size of the training partition (default: 0.8). Validation size is equal to 1-training.
+        :param test_size: Size of the validation partition (default: 0.2).
         :param batch_size: Size of the batch. (default: 32)
+        :param stratify: Whether to stratify class distribution (default: True).
         :return: A tuple of DataLoaders for training, validation and testing.
         """
         train_domains = [domain for i, domain in enumerate(self.data) if i != self.test_domain]
-        train_partition = ConcatDataset(train_domains)
-        train_set, val_set = torch.utils.data.random_split(train_partition,
-                                                           [partition_size, 1 - partition_size])
+        train_subsets = []
+        val_subsets = []
+        for dom in train_domains:
+            targets = dom.targets
+            if stratify:
+                train_idx, valid_idx = train_test_split(
+                    np.arange(len(targets)), test_size=test_size, random_state=42, shuffle=True, stratify=targets
+                )
+            else:
+                train_idx, valid_idx = train_test_split(
+                    np.arange(len(targets)), test_size=test_size, random_state=42, shuffle=True
+                )
 
-        train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=True)
+            train_subsets.append(Subset(dom, train_idx))
+            val_subsets.append(Subset(dom, valid_idx))
+
+        train_split = ConcatDataset(train_subsets)
+        val_split = ConcatDataset(val_subsets)
+
+        train_loader = DataLoader(train_split, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_split, batch_size=batch_size, shuffle=True)
         test_loader = DataLoader(self.data[self.test_domain], batch_size=batch_size, shuffle=True)
 
         return train_loader, val_loader, test_loader
