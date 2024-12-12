@@ -1,5 +1,5 @@
 # Model and dataset
-model: "densenet121"
+model: "DenseNet121"
 dataset: "PACS"
 
 # Training hyperparameters

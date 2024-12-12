@@ -1,12 +1,12 @@
 # Model and dataset
-model: "ResNet18"
+model: "ResNet34"
 dataset: "PACS"
 
 # Training hyperparameters
 lr: 1e-4
 batch_size: 64
 momentum: None # not used
-weight_decay: 1e-6
+weight_decay: 0.1
 epochs: 10
 eps: 1e-8
 betas: [0.9, 0.999]
@@ -18,14 +18,13 @@ nesterov: None # not used
 
 # Early stopping and scheduling
 use_early_stopping: true
-patience: 5
-use_scheduling: false
+patience: 3
+use_scheduling: true
 
 # Device and pretraining
 device: "cuda"
 pretrained: true
 
 # Experiment details
-experiment: "resnet18-pt-baseline-pacs"
+experiment: "resnet34-pt-baseline-pacs"
 num_runs: 10
-
