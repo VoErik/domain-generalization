@@ -1,15 +1,15 @@
 # Model and dataset
-model: "DenseNet161"
+model: "ResNet34"
 dataset: "PACS"
 
 # Training hyperparameters
 lr: 1e-4
-batch_size: 48
+batch_size: 64
 momentum: None # not used
-weight_decay: 0.003
-epochs: 10
+weight_decay: 1e-6
+epochs: 50
 eps: 1e-8
-betas: [0.9, 0.95]
+betas: [0.9, 0.999]
 
 # Optimization and loss
 criterion: "cross_entropy"
@@ -18,13 +18,13 @@ nesterov: None # not used
 
 # Early stopping and scheduling
 use_early_stopping: true
-patience: 4
-use_scheduling: false
+patience: 3
+use_scheduling: true
 
 # Device and pretraining
 device: "cuda"
 pretrained: true
 
 # Experiment details
-experiment: "densenet161-pt-baseline-pacs"
+experiment: "resnet34-pt-baseline-pacs"
 num_runs: 10
