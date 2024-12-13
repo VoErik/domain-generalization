@@ -3,7 +3,6 @@ from collections import defaultdict
 import random
 
 import numpy as np
-import torch
 import torchvision
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, ConcatDataset, Subset
@@ -145,7 +144,8 @@ class DomainDataset(MultiDomainDataset):
 def get_dataset(
         name: str,
         root_dir: str,
-        test_domain: int
+        test_domain: int,
+        **kwargs,
 ) -> DomainDataset:
     """
     Gets a domain dataset from a given name.
@@ -155,9 +155,9 @@ def get_dataset(
     :return:
     """
     if name == 'PACS':
-        return PACS(root_dir, test_domain=test_domain)
+        return PACS(root_dir, test_domain=test_domain, **kwargs)
     if name == 'camelyon17':
-        return Camelyon17(root_dir, test_domain=test_domain)
+        return Camelyon17(root_dir, test_domain=test_domain, **kwargs)
 
 
 """Insert new datasets below."""
@@ -167,7 +167,7 @@ class PACS(DomainDataset):
     domains = DOMAIN_NAMES['PACS']
     input_shape = (3, 244, 244)
 
-    def __init__(self, root, test_domain):
+    def __init__(self, root, test_domain, **kwargs):
         self.dir = os.path.join(root, "PACS/")
         super().__init__(self.dir, test_domain, augment=None)
 
@@ -176,6 +176,6 @@ class Camelyon17(DomainDataset):
     domains = DOMAIN_NAMES['camelyon17']
     input_shape = (3, 96, 96)
 
-    def __init__(self, root, test_domain):
+    def __init__(self, root, test_domain, **kwargs):
         self.dir = os.path.join(root, "camelyon17/")
         super().__init__(self.dir, test_domain, augment=None, subset=0.2)
