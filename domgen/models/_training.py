@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from typing import Tuple, List, Dict
 import torch
@@ -19,6 +20,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger('Experiment Logger')
 
+def save_checkpoint(state, filename):
+    torch.save(state, filename)
 
 def train_model(
         args,
@@ -83,7 +86,8 @@ def train_epoch(
         train_loader: torch.utils.data.DataLoader,
         device: str,
         tb_writer: SummaryWriter = None,
-        epoch: int = None
+        epoch: int = None,
+        scheduler = None
 ) -> Tuple[float, float]:
     """
     Runs a training epoch.
@@ -102,9 +106,6 @@ def train_epoch(
     correct_predictions = 0
     total_predictions = 0
 
-    scheduler = None
-    if args.use_scheduling:
-        scheduler = ReduceLROnPlateau(optimizer, patience=args.patience)
 
     with tqdm(train_loader, unit='batch', disable=args.silent) as batch:
         for i, (inputs, labels) in enumerate(batch):
@@ -118,8 +119,7 @@ def train_epoch(
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
-            if scheduler:
-                scheduler.step(loss)
+
 
             predictions = outputs.argmax(dim=1, keepdim=True).squeeze()
             correct = (predictions == labels).sum().item()
@@ -151,6 +151,7 @@ def validate(
         criterion: torch.nn.Module,
         device: str,
         tb_writer: SummaryWriter = None,
+        scheduler = None
 ) -> Tuple[float, float]:
     """
     Runs the model on the validation set and calculates loss and accuracy across all batches.
@@ -185,6 +186,9 @@ def validate(
 
     avg_loss = val_loss / total_predictions
     avg_accuracy = 100. * correct_predictions / total_predictions
+
+    if scheduler:
+        scheduler.step(avg_loss)
 
     if tb_writer is not None:
         tb_writer.add_scalar('Loss/val', avg_loss, 1)
@@ -270,14 +274,19 @@ def _training(
     best_vloss = float('inf')
     best_vacc = 0.0
     metrics_summary = []
-
+    save_path = f'{args.log_dir}/{args.experiment}/run_{args.experiment_number}/{args.domain_name}/models'
+    os.makedirs(save_path, exist_ok=True)
     early_stopping = None
     if args.use_early_stopping:
-        early_stopping= EarlyStopping(patience=args.patience)
+        early_stopping= EarlyStopping(patience=2*args.patience)
+
+    scheduler = None
+    if args.use_scheduling:
+        scheduler = ReduceLROnPlateau(optimizer, patience=args.patience)
 
     for epoch in range(num_epochs):
         logger.info(f'EPOCH {epoch + 1}:')
-
+        print('Last LR: ', scheduler.get_last_lr())
         avg_loss, avg_accuracy = train_epoch(
             args=args,
             epoch=epoch,
@@ -286,7 +295,7 @@ def _training(
             criterion=criterion,
             optimizer=optimizer,
             train_loader=train_loader,
-            device=device
+            device=device,
         )
 
         avg_vloss, avg_vaccuracy = validate(
@@ -295,7 +304,8 @@ def _training(
             model=model,
             criterion=criterion,
             val_loader=val_loader,
-            device=device
+            device=device,
+            scheduler=scheduler,
         )
 
         logger.info(f'LOSS: TRAIN: {avg_loss} VAL: {avg_vloss}')
@@ -307,10 +317,18 @@ def _training(
                                   epoch + 1)
             tb_writer.flush()
 
-        if avg_vloss < best_vloss:
-            best_vloss = avg_vloss
         if avg_vaccuracy > best_vacc:
             best_vacc = avg_vaccuracy
+        if avg_vloss < best_vloss:
+            best_vloss = avg_vloss
+            save_checkpoint({'epoch': epoch + 1,
+                             'model_state_dict': model.state_dict(),
+                             'optimizer_state_dict': optimizer.state_dict(),
+                             'loss': avg_vloss,
+                             'accuracy': avg_vaccuracy},
+                            os.path.join(save_path, 'best.pth'))
+            logger.info(f'Best model saved at epoch {epoch + 1}')
+
 
         metrics = {
             'epoch': epoch,
@@ -322,7 +340,12 @@ def _training(
             'best_validation_loss': best_vloss
         }
         metrics_summary.append(metrics)
-
+        save_checkpoint({'epoch': epoch + 1,
+                         'model_state_dict': model.state_dict(),
+                         'optimizer_state_dict': optimizer.state_dict(),
+                         'loss': avg_vloss},
+                        os.path.join(save_path, 'last.pth'))
+        early_stopping(best_vloss)
         if early_stopping and early_stopping.stop:
             break
 
