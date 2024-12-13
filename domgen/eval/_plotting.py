@@ -21,11 +21,11 @@ def plot_accuracies(
 
     df = pd.read_csv(path)
 
-    avg_accuracy = df["avg_acc"].mean()
     avg_worst_case = df["worst_case_acc"].mean()
+    avg_accuracy = df["avg_acc"].mean()
     avg_best_case = df["best_case_acc"].mean()
 
-    features = ["avg_acc", "worst_case_acc", "best_case_acc"]
+    features = ["worst_case_acc","avg_acc", "best_case_acc"]
     x = range(len(features))
 
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -35,10 +35,10 @@ def plot_accuracies(
     positions = [(i - (num_domains - 1) / 2) * bar_width for i in range(num_domains)]
     colormap = cm.get_cmap(cmap, num_domains)
 
-    line_avg = ax.axhline(y=avg_accuracy, color="blue", linestyle="--", linewidth=2,
-                          label=f"Average Accuracy ({avg_accuracy:.2f})")
     line_worst = ax.axhline(y=avg_worst_case, color="orange", linestyle="--", linewidth=2,
                             label=f"Worst Case Accuracy ({avg_worst_case:.2f})")
+    line_avg = ax.axhline(y=avg_accuracy, color="blue", linestyle="--", linewidth=2,
+                          label=f"Average Accuracy ({avg_accuracy:.2f})")
     line_best = ax.axhline(y=avg_best_case, color="green", linestyle="--", linewidth=2,
                            label=f"Best Case Accuracy ({avg_best_case:.2f})")
 
@@ -93,8 +93,72 @@ def _load_run_data(base_dir: str) -> Dict[str, List]:
                     domain_data[domain_folder].append(data)
     return domain_data
 
-
 def _plot_metric_curves(
+        run_data: Dict[str, List],
+        metric_name: str,
+        ylabel: str,
+        title: str,
+        save_path: str = None,
+        show: bool = True,
+) -> None:
+    """Plot the metric curves for each domain with padding for runs with different epochs."""
+    for domain, runs in run_data.items():
+        # Find the union of all epochs across runs
+        all_epochs = sorted({epoch for run in runs for epoch in run['epoch']})
+
+        # Align metrics by padding with NaN for missing epochs
+        metrics = []
+        for run in runs:
+            run_epochs = run['epoch']
+            run_metrics = run[metric_name].values
+
+            # Create an array of NaNs for all epochs
+            aligned_metrics = np.full(len(all_epochs), np.nan)
+            # Find indices where run_epochs match all_epochs
+            indices = [all_epochs.index(epoch) for epoch in run_epochs]
+            aligned_metrics[indices] = run_metrics
+            metrics.append(aligned_metrics)
+
+        metrics = np.array(metrics)
+
+        # Compute statistics while ignoring NaN
+        mean_curve = np.nanmean(metrics, axis=0)
+        min_curve = np.nanmin(metrics, axis=0)
+        max_curve = np.nanmax(metrics, axis=0)
+
+        # Plotting
+        fig = plt.figure(figsize=(10, 6))
+        plt.plot(all_epochs, mean_curve, label='Average', color='black', linestyle='--', linewidth=1.5)
+        plt.fill_between(all_epochs, min_curve, max_curve, color='blue', alpha=0.4, label='Min-Max Range')
+
+        colormap = cm.get_cmap('cividis', len(metrics))
+        for run_idx, run_metrics in enumerate(metrics):
+            plt.plot(all_epochs,
+                     run_metrics,
+                     color=colormap(run_idx),
+                     alpha=0.7,
+                     linewidth=0.8,
+                     label=f'Run' if run_idx == 0 else '')
+
+        plt.xlabel("Epoch")
+        plt.ylabel(ylabel)
+        if 'Accuracy' in title:
+            plt.ylim(0, 100)
+            plt.gca().yaxis.set_major_locator(plt.MultipleLocator(5))
+            plt.legend(loc="lower right")
+        elif 'Loss' in title:
+            plt.ylim(bottom=0)
+            plt.legend(loc="upper right")
+        plt.title(f"{title} for {domain}")
+
+        if save_path:
+            save_name = f'{domain}_{metric_name}_plot'
+            _save_plot(save_path, fig, save_name)
+        if show:
+            plt.show()
+
+
+def _plot_metric_curves2(
         run_data: Dict[str, List],
         metric_name: str,
         ylabel: str,
