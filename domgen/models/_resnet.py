@@ -1,6 +1,8 @@
 import torch.nn as nn
 from torch import Tensor
 from typing import Type
+import torchvision.models as models
+from copy import deepcopy
 
 
 class ResNet(nn.Module):
@@ -85,6 +87,8 @@ class BasicBlock (nn.Module):
             bias=False
         )
         self.bn2 = nn.BatchNorm2d(out_channels)
+
+        self.downsample = downsample
 
         self.shortcut = nn.Sequential()
         if stride != 1 or in_channels != out_channels:
@@ -193,21 +197,70 @@ class Bottleneck (nn.Module):
         return out
 
 
-def resnet18(num_classes: int):
+def load_pretrained_weights(model, model_name: str):
+    if model_name == 'resnet18':
+        pretrained_model = models.resnet18(pretrained=True)
+    elif model_name == 'resnet34':
+        pretrained_model = models.resnet34(pretrained=True)
+    elif model_name == 'resnet50':
+        pretrained_model = models.resnet50(pretrained=True)
+    elif model_name == 'resnet101':
+        pretrained_model = models.resnet101(pretrained=True)
+    elif model_name == 'resnet152':
+        pretrained_model = models.resnet152(pretrained=True)
+    else:
+        raise ValueError(f"Unsupported model name: {model_name}")
+
+    pretrained_state = deepcopy(pretrained_model.state_dict())
+    model.load_state_dict(pretrained_state, strict=False)
+    return model
+
+
+def resnet18_scratch(num_classes: int):
     return ResNet(BasicBlock, [2, 2, 2, 2], num_classes)
 
 
-def resnet34(num_classes: int):
+def resnet34_scratch(num_classes: int):
     return ResNet(BasicBlock, [3, 4, 6, 3], num_classes)
 
 
-def resnet50(num_classes: int):
+def resnet50_scratch(num_classes: int):
     return ResNet(Bottleneck, [3, 4, 6, 3], num_classes)
 
 
-def resnet101(num_classes: int):
+def resnet101_scratch(num_classes: int):
     return ResNet(Bottleneck, [3, 4, 23, 3], num_classes)
 
 
-def resnet152(num_classes: int):
+def resnet152_scratch(num_classes: int):
     return ResNet(Bottleneck, [3, 8, 36, 3], num_classes)
+
+
+def resnet18():
+    model = resnet18_scratch(num_classes=1000)
+    model = load_pretrained_weights(model, 'resnet18')
+    return model
+
+
+def resnet34():
+    model = resnet34_scratch(num_classes=1000)
+    model = load_pretrained_weights(model, 'resnet34')
+    return model
+
+
+def resnet50():
+    model = resnet50_scratch(num_classes=1000)
+    model = load_pretrained_weights(model, 'resnet50')
+    return model
+
+
+def resnet101():
+    model = resnet101_scratch(num_classes=1000)
+    model = load_pretrained_weights(model, 'resnet101')
+    return model
+
+
+def resnet152():
+    model = resnet152_scratch(num_classes=1000)
+    model = load_pretrained_weights(model, 'resnet152')
+    return model
