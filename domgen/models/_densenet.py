@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 from torch import Tensor
+import torchvision.models as models
+from copy import deepcopy
 
 
 class DenseNet(nn.Module):
@@ -88,17 +90,60 @@ class TransitionLayer(nn.Module):
         return self.transition(x)
 
 
-def densenet121():
+def load_pretrained_weights(model: nn.Module, model_name: str):
+    if model_name == 'densenet121':
+        pretrained_model = models.densenet121(pretrained=True)
+    elif model_name == 'densenet169':
+        pretrained_model = models.densenet169(pretrained=True)
+    elif model_name == 'densenet201':
+        pretrained_model = models.densenet201(pretrained=True)
+    else:
+        raise ValueError(f"Model {model_name} is not supported for loading pretrained weights.")
+
+    pretrained_state = deepcopy(pretrained_model.state_dict())
+    model.load_state_dict(pretrained_state, strict=False)
+    return model
+
+
+def densenet121_scratch():
     return DenseNet(growth_rate=32, block_layers=[6, 12, 24, 16], num_classes=1000)
 
 
-def densenet169():
+def densenet169_scratch():
     return DenseNet(growth_rate=32, block_layers=[6, 12, 32, 32], num_classes=1000)
 
 
-def densenet201():
+def densenet201_scratch():
     return DenseNet(growth_rate=32, block_layers=[6, 12, 48, 32], num_classes=1000)
 
 
-def densenet264():
+# DenseNet264 isn't supported in Torchvision for ImageNet weights!
+# TODO: trotzdem drinlassen?
+def densenet264_scratch():
     return DenseNet(growth_rate=32, block_layers=[6, 12, 64, 48], num_classes=1000)
+
+
+def densenet121():
+    model = densenet121_scratch()
+    model = load_pretrained_weights(model, "densenet121")
+    return model
+
+
+def densenet169():
+    model = densenet169_scratch()
+    model = load_pretrained_weights(model, "densenet169")
+    return model
+
+
+def densenet201():
+    model = densenet201_scratch()
+    model = load_pretrained_weights(model, "densenet201")
+    return model
+
+
+# DenseNet264 isn't supported in Torchvision for ImageNet weights!
+# TODO: trotzdem drinlassen?
+def densenet264():
+    model = densenet264_scratch()
+    model = load_pretrained_weights(model, "densenet264")
+    return model
