@@ -7,7 +7,6 @@ import torchvision
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, ConcatDataset, Subset
 from torchvision.datasets import ImageFolder
-from domgen.augment import imagenet_transform
 from typing import Any
 
 """To add a new dataset, just create a class that inherits from `DomainDataset`."""
@@ -52,7 +51,10 @@ class DomainDataset(MultiDomainDataset):
         self.subset = subset
         # base augment = ImageNet
         input_size = self.input_shape[-2], self.input_shape[-1]
+
+        from domgen.augment import imagenet_transform
         transform = imagenet_transform(input_size=input_size)
+
         self.data = []
         for i, domain in enumerate(self.domains):
             if augment and (i != self.test_domain):
