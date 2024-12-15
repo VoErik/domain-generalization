@@ -49,10 +49,15 @@ class AugmentationTuner(Tuner):
             # Todo: Here, the logic for creating the augmentation that is passed to the get_dataset function is located
             # It should work for the following scenarios:
             # 1. Pass in an entire torchvision.Compose object.
+            if conf['option'] == 'choose-compose':
+                pass
             # 2. Pass in list of possible augmentation steps, then create a Compose object from them
+            if conf['option'] == "build-compose":
+                pass
             # 3. Pass in a Compose object but tune the parameters of the augmentation steps.
+            if conf['option'] == "tune-compose":
+                pass
             augmentation = None
-
 
             dataset = get_dataset(
                 root_dir=self.base_config["datadir"], name=self.base_config["dataset"],
