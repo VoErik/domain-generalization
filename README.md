@@ -7,19 +7,21 @@ python -m pip install -e .
 
 ## Hyperparameters
 
-We ran a basic hyperparameter search for each leave-out split using `raytune`. For each trial run we sampled 30 times and trained for 10 (pretrained) or 100 (new initialization) epochs.
+We ran a basic hyperparameter search for each leave-out split using `raytune`. For each trial run we sampled 30 times and trained for 10 (pretrained) or 100 (new initialization) epochs. Generally, no clear inter-domain agreement on **a** best hyperparameter configuration could be found. Instead, we opted for the agreed upon set with the highest validation accuracy each, with no validation accuracy < 92%.
 
-| Model            | LR     | Batch Size | Momentum | Weight Decay | Optimizer | Betas | Eps  | Nesterov | Acc  |
-|------------------|--------|------------|----------|--------------|-----------|-------|------|----------|------|
-| Resnet18 (pt)    | None   | None       | None     | None         | None      | None  | None | None     | None |
-| Resnet50 (pt)    | None   | None       | None     | None         | None      | None  | None | None     | None |
-| Resnet18         | None   | None       | None     | None         | None      | None  | None | None     | None |
-| Resnet50         | None   | None       | None     | None         | None      | None  | None | None     | None |
-| Densenet121 (pt) | 0.0001 | 16         | 0.2      | None         | adam      | None  | 1e7  | True     | None |
-| Densenet201 (pt) | None   | None       | None     | None         | None      | None  | None | None     | None |
-| Densenet121      | None   | None       | None     | None         | None      | None  | None | None     | None |
-| Densenet201      | None   | None       | None     | None         | None      | None  | None | None     | None |
-*\* = Not relevant for this configuration.*<br>
+| Model            | LR     | Batch Size | Weight Decay | Optimizer | Betas       | Eps  |
+|------------------|--------|------------|--------------|-----------|-------------|------|
+| Resnet18 (pt)    | 1e-3   | 64         | 0.1          | AdamW     | 0.9, 0.999  | 1e-8 |
+| Resnet34 (pt)    | 1e-3   | 64         | 0.1          | AdamW     | 0.9, 0.999  | 1e-8 |
+| Resnet50 (pt)    | 1e-3   | 64         | 0.1          | AdamW     | 0.9, 0.999  | 1e-8 |
+| Resnet18         | 1e-3   | 64         | 0.1          | AdamW     | 0.9, 0.999  | 1e-8 |
+| Resnet34 (pt)    | 1e-3   | 64         | 0.1          | AdamW     | 0.9, 0.999  | 1e-8 |
+| Resnet50 (pt)    | 1e-3   | 64         | 0.1          | AdamW     | 0.9, 0.999  | 1e-8 |
+| Densenet121 (pt) | 1e-3   | 48         | 0            | Adam      | 0.9, 0.999  | 1e-8 |
+| Densenet161 (pt) | 1e-3   | 32         | 0.003        | AdamW     | 0.9, 0.95   | 1e-8 |
+| Densenet121      | 1e-3   | 48         | 0            | Adam      | 0.99, 0.999 | 1e-8 | 
+| Densenet161      | 1e-3   | 32         | 0            | Adam      | 0.99, 0.999 | 1e-8 | 
+
 *(pt) = pre-trained (ImageNet weights).*
 
 For the criterion we chose `CrossEntropy` for all runs. 
