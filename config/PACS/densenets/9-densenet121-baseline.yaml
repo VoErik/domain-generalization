@@ -18,7 +18,7 @@ nesterov: false
 
 # Early stopping and scheduling
 use_early_stopping: true
-patience: 4
+patience: 3
 use_scheduling: true
 
 # Device and pretraining

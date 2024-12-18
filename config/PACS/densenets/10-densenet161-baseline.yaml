@@ -4,7 +4,7 @@ dataset: "PACS"
 
 # Training hyperparameters
 lr: 1e-3
-batch_size: 48
+batch_size: 32
 momentum: None
 weight_decay: 0
 epochs: 50
@@ -18,7 +18,7 @@ nesterov: false
 
 # Early stopping and scheduling
 use_early_stopping: true
-patience: 4
+patience: 3
 use_scheduling: true
 
 # Device and pretraining
@@ -26,5 +26,5 @@ device: "cuda"
 pretrained: false
 
 # Experiment details
-experiment: "densenet121-pt-baseline-pacs"
+experiment: "densenet161-baseline-pacs"
 num_runs: 10
