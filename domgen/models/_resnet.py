@@ -41,6 +41,11 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x: Tensor) -> Tensor:
+        input_channels = x.size(1)
+        if input_channels != 3:
+            conv_adjust = nn.Conv2d(input_channels, 3, kernel_size=1, stride=1, bias=False)
+            x = conv_adjust(x)
+
         out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
@@ -197,70 +202,46 @@ class Bottleneck (nn.Module):
         return out
 
 
-def load_pretrained_weights(model, model_name: str):
-    if model_name == 'resnet18':
-        pretrained_model = models.resnet18(pretrained=True)
-    elif model_name == 'resnet34':
-        pretrained_model = models.resnet34(pretrained=True)
-    elif model_name == 'resnet50':
-        pretrained_model = models.resnet50(pretrained=True)
-    elif model_name == 'resnet101':
-        pretrained_model = models.resnet101(pretrained=True)
-    elif model_name == 'resnet152':
-        pretrained_model = models.resnet152(pretrained=True)
-    else:
-        raise ValueError(f"Unsupported model name: {model_name}")
+def _resnet(model_name: str, num_classes: int, pretrained: bool = False) -> ResNet:
+    """
+    Creates a ResNet model with or without pretrained weights.
 
-    pretrained_state = deepcopy(pretrained_model.state_dict())
-    model.load_state_dict(pretrained_state, strict=False)
-    return model
+    :param model_name: Name of the ResNet variant (e.g., 'resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152').
+    :param num_classes: Number of output classes for classification.
+    :param pretrained: Whether to load pretrained weights (default: False).
+    :return: A ResNet model instance.
+    """
 
+    resnet_configs = {
+        'resnet18': [BasicBlock, [2, 2, 2, 2]],  # block type, layers per block
+        'resnet34': [BasicBlock, [3, 4, 6, 3]],
+        'resnet50': [Bottleneck, [3, 4, 6, 3]],
+        'resnet101': [Bottleneck, [3, 4, 23, 3]],
+        'resnet152': [Bottleneck, [3, 8, 36, 3]],
+    }
 
-def resnet18_scratch(num_classes: int):
-    return ResNet(BasicBlock, [2, 2, 2, 2], num_classes)
+    if model_name not in resnet_configs:
+        raise ValueError(f"Unknown ResNet variant: '{model_name}'. "
+                         f"Available options: {list(resnet_configs.keys())}")
 
+    block, layers = resnet_configs[model_name]
+    model = ResNet(block, layers, num_classes)
 
-def resnet34_scratch(num_classes: int):
-    return ResNet(BasicBlock, [3, 4, 6, 3], num_classes)
+    if pretrained:  # TODO würde überflüssig werden?
+        if model_name == 'resnet18':
+            pretrained_model = models.resnet18(weights="IMAGENET1K_V1")
+        elif model_name == 'resnet34':
+            pretrained_model = models.resnet34(weights="IMAGENET1K_V1")
+        elif model_name == 'resnet50':
+            pretrained_model = models.resnet50(weights="IMAGENET1K_V1")
+        elif model_name == 'resnet101':
+            pretrained_model = models.resnet101(weights="IMAGENET1K_V1")
+        elif model_name == 'resnet152':
+            pretrained_model = models.resnet152(weights="IMAGENET1K_V1")
+        else:
+            raise ValueError(f"Unsupported model name: {model_name}")
 
+        pretrained_state = deepcopy(pretrained_model.state_dict())
+        model.load_state_dict(pretrained_state, strict=False)
 
-def resnet50_scratch(num_classes: int):
-    return ResNet(Bottleneck, [3, 4, 6, 3], num_classes)
-
-
-def resnet101_scratch(num_classes: int):
-    return ResNet(Bottleneck, [3, 4, 23, 3], num_classes)
-
-
-def resnet152_scratch(num_classes: int):
-    return ResNet(Bottleneck, [3, 8, 36, 3], num_classes)
-
-
-def resnet18():
-    model = resnet18_scratch(num_classes=1000)
-    model = load_pretrained_weights(model, 'resnet18')
-    return model
-
-
-def resnet34():
-    model = resnet34_scratch(num_classes=1000)
-    model = load_pretrained_weights(model, 'resnet34')
-    return model
-
-
-def resnet50():
-    model = resnet50_scratch(num_classes=1000)
-    model = load_pretrained_weights(model, 'resnet50')
-    return model
-
-
-def resnet101():
-    model = resnet101_scratch(num_classes=1000)
-    model = load_pretrained_weights(model, 'resnet101')
-    return model
-
-
-def resnet152():
-    model = resnet152_scratch(num_classes=1000)
-    model = load_pretrained_weights(model, 'resnet152')
     return model

@@ -9,6 +9,7 @@ class DenseNet(nn.Module):
     def __init__(self, growth_rate: int, block_layers: list, num_classes: int):
         super(DenseNet, self).__init__()
         self.growth_rate = growth_rate
+
         self.init_conv = nn.Sequential(
             nn.Conv2d(3, 2 * growth_rate, kernel_size=7, stride=2, padding=3, bias=False),
             nn.BatchNorm2d(2 * growth_rate),
@@ -34,9 +35,15 @@ class DenseNet(nn.Module):
         )
 
     def forward(self, x):
+        input_channels = x.size(1)
+        if input_channels != 3:
+            conv_adjust = nn.Conv2d(input_channels, 3, kernel_size=1, stride=1, bias=False)
+            x = conv_adjust(x)
+
         out = self.init_conv(x)
         out = self.features(out)
         out = self.classifier(out)
+
         return out
 
 
@@ -90,60 +97,41 @@ class TransitionLayer(nn.Module):
         return self.transition(x)
 
 
-def load_pretrained_weights(model: nn.Module, model_name: str):
-    if model_name == 'densenet121':
-        pretrained_model = models.densenet121(pretrained=True)
-    elif model_name == 'densenet169':
-        pretrained_model = models.densenet169(pretrained=True)
-    elif model_name == 'densenet201':
-        pretrained_model = models.densenet201(pretrained=True)
-    else:
-        raise ValueError(f"Model {model_name} is not supported for loading pretrained weights.")
+def _densenet(model_name: str, num_classes: int, pretrained: bool = False) -> DenseNet:
+    """
+    Creates a DenseNet model with or without pretrained weights.
 
-    pretrained_state = deepcopy(pretrained_model.state_dict())
-    model.load_state_dict(pretrained_state, strict=False)
-    return model
+    :param model_name: Name of the DenseNet variant (e.g., 'densenet121', 'densenet169', 'densenet201').
+    :param num_classes: Number of output classes for classification.
+    :param pretrained: Whether to load pretrained weights (default: False).
+    :return: A DenseNet model instance.
+    """
 
+    densenet_configs = {
+        'densenet121': [32, [6, 12, 24, 16]],  # growth_rate, block_layers
+        'densenet161': [56, [6, 12, 36, 24]],
+        'densenet169': [32, [6, 12, 32, 32]],
+        'densenet201': [32, [6, 12, 48, 32]],
+    }
 
-def densenet121_scratch():
-    return DenseNet(growth_rate=32, block_layers=[6, 12, 24, 16], num_classes=1000)
+    if model_name not in densenet_configs:
+        raise ValueError(f"Unknown DenseNet variant: '{model_name}'. "
+                         f"Available options: {list(densenet_configs.keys())}")
 
+    growth_rate, block_layers = densenet_configs[model_name]
+    model = DenseNet(growth_rate=growth_rate, block_layers=block_layers, num_classes=num_classes)
 
-def densenet169_scratch():
-    return DenseNet(growth_rate=32, block_layers=[6, 12, 32, 32], num_classes=1000)
+    if pretrained:  # TODO würde überflüssig werden?
+        if model_name == 'densenet121':
+            pretrained_model = models.densenet121(weights=models.DenseNet121_Weights.DEFAULT)
+        elif model_name == 'densenet169':
+            pretrained_model = models.densenet169(weights=models.DenseNet169_Weights.DEFAULT)
+        elif model_name == 'densenet201':
+            pretrained_model = models.densenet201(weights=models.DenseNet201_Weights.DEFAULT)
+        else:
+            raise ValueError(f"Model {model_name} is not supported for loading pretrained weights.")
 
+        pretrained_state = deepcopy(pretrained_model.state_dict())
+        model.load_state_dict(pretrained_state, strict=False)
 
-def densenet201_scratch():
-    return DenseNet(growth_rate=32, block_layers=[6, 12, 48, 32], num_classes=1000)
-
-
-# DenseNet264 isn't supported in Torchvision for ImageNet weights!
-# TODO: trotzdem drinlassen?
-def densenet264_scratch():
-    return DenseNet(growth_rate=32, block_layers=[6, 12, 64, 48], num_classes=1000)
-
-
-def densenet121():
-    model = densenet121_scratch()
-    model = load_pretrained_weights(model, "densenet121")
-    return model
-
-
-def densenet169():
-    model = densenet169_scratch()
-    model = load_pretrained_weights(model, "densenet169")
-    return model
-
-
-def densenet201():
-    model = densenet201_scratch()
-    model = load_pretrained_weights(model, "densenet201")
-    return model
-
-
-# DenseNet264 isn't supported in Torchvision for ImageNet weights!
-# TODO: trotzdem drinlassen?
-def densenet264():
-    model = densenet264_scratch()
-    model = load_pretrained_weights(model, "densenet264")
     return model

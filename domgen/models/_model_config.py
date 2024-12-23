@@ -1,7 +1,8 @@
 import torch
 import torch.optim as optim
 import torch.nn as nn
-
+from _resnet import _resnet
+from _densenet import _densenet
 
 def get_optimizer(
         optimizer_name: str,
@@ -68,7 +69,7 @@ import torchvision.models as models
 def get_model(
         model_name: str,
         num_classes: int,
-        pretrained:bool = True
+        pretrained: bool
 ) -> nn.Module:
     """
     Returns a PyTorch model based on the given name.
@@ -98,9 +99,12 @@ def get_model(
                          f"Available options: {list(models_dict.keys())}")
 
     if pretrained:
-        model = models_dict[model_name](weights='DEFAULT')
-    else:
-        model = models_dict[model_name]()
+        model = models_dict[model_name](weights='DEFAULT')  # diese Zeile macht Teil meines Codes in _resnet() (_resnet.py)
+    else:                                                      # & _densenet (_densenet.py) überflüssig
+        if 'ResNet' in model_name:
+            model = _resnet(model_name, num_classes, pretrained)
+        elif 'DenseNet' in model_name:
+            model = _densenet(model_name, num_classes, pretrained)
 
     if 'ResNet' in model_name:
         model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
