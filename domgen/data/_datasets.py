@@ -7,7 +7,10 @@ import torchvision
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, ConcatDataset, Subset
 from torchvision.datasets import ImageFolder
+from domgen.augment import imagenet_transform
 from typing import Any
+from domgen.augment._transforms import combine_augmentations
+from domgen.augment._transforms import all_augmentations, pacs_aug, camelyon17_aug, shared_aug
 
 """To add a new dataset, just create a class that inherits from `DomainDataset`."""
 
@@ -33,7 +36,7 @@ class DomainDataset(MultiDomainDataset):
             self,
             root: str,
             test_domain: int,
-            augment: torchvision.transforms.Compose | Any = None,
+            augment: list[dict] = None,
             subset: float = None,
     ) -> None:
         """
@@ -49,16 +52,19 @@ class DomainDataset(MultiDomainDataset):
         self.domains = sorted([directory.name for directory in os.scandir(root) if directory.is_dir()])
         self.test_domain = test_domain
         self.subset = subset
+        self.data = []
+
         # base augment = ImageNet
         input_size = self.input_shape[-2], self.input_shape[-1]
-
-        from domgen.augment import imagenet_transform
         transform = imagenet_transform(input_size=input_size)
 
-        self.data = []
+        pipeline = None
+        if augment:
+            pipeline = combine_augmentations(augment)
+
         for i, domain in enumerate(self.domains):
-            if augment and (i != self.test_domain):
-                domain_transform = augment
+            if pipeline and (i != self.test_domain):
+                domain_transform = lambda img: pipeline(image=np.array(img))['image']
             else:
                 domain_transform = transform
 
@@ -171,7 +177,7 @@ class PACS(DomainDataset):
 
     def __init__(self, root, test_domain, **kwargs):
         self.dir = os.path.join(root, "PACS/")
-        super().__init__(self.dir, test_domain, augment=None)
+        super().__init__(self.dir, test_domain, augment=[pacs_aug, shared_aug])
 
 
 class Camelyon17(DomainDataset):
@@ -180,4 +186,4 @@ class Camelyon17(DomainDataset):
 
     def __init__(self, root, test_domain, **kwargs):
         self.dir = os.path.join(root, "camelyon17/")
-        super().__init__(self.dir, test_domain, augment=None, subset=0.2)
+        super().__init__(self.dir, test_domain, augment=[camelyon17_aug, shared_aug], subset=0.2)
