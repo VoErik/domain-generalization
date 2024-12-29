@@ -4,7 +4,10 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import numpy as np
 from typing import Dict, List, Tuple
+
+from matplotlib.ticker import MaxNLocator, MultipleLocator
 from parcoords import plot_parcoords
+from scipy.signal import savgol_filter
 
 
 def plot_accuracies(
@@ -21,11 +24,11 @@ def plot_accuracies(
 
     df = pd.read_csv(path)
 
-    avg_accuracy = df["avg_acc"].mean()
     avg_worst_case = df["worst_case_acc"].mean()
+    avg_accuracy = df["avg_acc"].mean()
     avg_best_case = df["best_case_acc"].mean()
 
-    features = ["avg_acc", "worst_case_acc", "best_case_acc"]
+    features = ["worst_case_acc","avg_acc", "best_case_acc"]
     x = range(len(features))
 
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -35,10 +38,10 @@ def plot_accuracies(
     positions = [(i - (num_domains - 1) / 2) * bar_width for i in range(num_domains)]
     colormap = cm.get_cmap(cmap, num_domains)
 
-    line_avg = ax.axhline(y=avg_accuracy, color="blue", linestyle="--", linewidth=2,
-                          label=f"Average Accuracy ({avg_accuracy:.2f})")
     line_worst = ax.axhline(y=avg_worst_case, color="orange", linestyle="--", linewidth=2,
                             label=f"Worst Case Accuracy ({avg_worst_case:.2f})")
+    line_avg = ax.axhline(y=avg_accuracy, color="blue", linestyle="--", linewidth=2,
+                          label=f"Average Accuracy ({avg_accuracy:.2f})")
     line_best = ax.axhline(y=avg_best_case, color="green", linestyle="--", linewidth=2,
                            label=f"Best Case Accuracy ({avg_best_case:.2f})")
 
@@ -76,9 +79,11 @@ def plot_accuracies(
 
 
 def _load_run_data(base_dir: str) -> Dict[str, List]:
-    """Load training metrics from each run and domain folder and return as a nested dictionary.
+    """
+    Load training metrics from each run and domain folder and return as a nested dictionary.
     :param base_dir: path to experiment directory.
-    :return: nested dictionary with run and domain data."""
+    :return: nested dictionary with run and domain data.
+    """
     domain_data = {}
     for run_folder in sorted(os.listdir(base_dir)):
         run_path = os.path.join(base_dir, run_folder)
@@ -93,7 +98,6 @@ def _load_run_data(base_dir: str) -> Dict[str, List]:
                     domain_data[domain_folder].append(data)
     return domain_data
 
-
 def _plot_metric_curves(
         run_data: Dict[str, List],
         metric_name: str,
@@ -101,45 +105,96 @@ def _plot_metric_curves(
         title: str,
         save_path: str = None,
         show: bool = True,
+        margin_type: str = "std-dev",
+        smooth: bool = True,
+        smoothing_window: int = 5,
+        polyorder: int = 2
 ) -> None:
-    """Plot the metric curves for each domain with an average line and min-max margin.
-    :param run_data: nested dictionary with run and domain data.
-    :param metric_name: name of the metric to plot.
-    :param ylabel: name of the y-axis label.
-    :param title: title of the plot.
-    :param save_path: path to save the figure. Default is None.
-    :return: None"""
+    """
+    Plot metric curves with margin (either standard deviation or min-max) as well as average.
+    Handles runs with varying epoch lengths by extending shorter runs.
+
+    :param run_data: Nested dictionary with run and domain data.
+    :param metric_name: Metric name.
+    :param ylabel: Label for the y-axis.
+    :param title: Title for the plot.
+    :param save_path: Path to save the figure.
+    :param show: Whether to show the plot. Default is True. Care: Disable for training loop.
+    :param margin_type: Margin type. Options: [std-dev, min-max]. Default is std-dev.
+    :param smooth: Whether to smooth the curve. Default is True.
+    :param smoothing_window: Smoothing window parameter. Default is 5.
+    :param polyorder: Polynomial order for smoothing curve. Default is 2.
+    :return: None
+    """
     for domain, runs in run_data.items():
-        epochs = runs[0]['epoch']  # Assuming each run has the same number of epochs
-        metrics = np.array([run[metric_name].values for run in runs])
+        max_epochs = max(len(run['epoch']) for run in runs)
+        all_epochs = np.arange(0, max_epochs)
+
+        extended_metrics = []
+
+        for run in runs:
+            run_epochs = np.array(run['epoch'])
+            run_metrics = np.array(run[metric_name])
+
+            if len(run_epochs) < max_epochs:
+                missing_epochs = np.arange(len(run_epochs), max_epochs)
+                run_epochs = np.concatenate([run_epochs, missing_epochs])
+                last_metric = run_metrics[-1]
+                run_metrics = np.concatenate([run_metrics, [last_metric] * len(missing_epochs)])
+
+            extended_metrics.append(run_metrics)
+
+        metrics = np.vstack(extended_metrics)
 
         mean_curve = np.mean(metrics, axis=0)
-        min_curve = np.min(metrics, axis=0)
-        max_curve = np.max(metrics, axis=0)
+
+        if margin_type == "min-max":
+            min_curve = np.min(metrics, axis=0)
+            max_curve = np.max(metrics, axis=0)
+            lower_bound, upper_bound = min_curve, max_curve
+        elif margin_type == "std-dev":
+            std_dev = np.std(metrics, axis=0)
+            lower_bound, upper_bound = mean_curve - std_dev, mean_curve + std_dev
+        else:
+            raise ValueError("Invalid margin type. Use 'min-max' or 'std-dev'.")
+
+        if smooth:
+            mean_curve = savgol_filter(mean_curve, smoothing_window, polyorder)
+            lower_bound = savgol_filter(lower_bound, smoothing_window, polyorder)
+            upper_bound = savgol_filter(upper_bound, smoothing_window, polyorder)
 
         fig = plt.figure(figsize=(10, 6))
-        plt.plot(epochs, mean_curve, label='Average', color='black', linestyle='--', linewidth=1.5)
-        plt.fill_between(epochs, min_curve, max_curve, color='blue', alpha=0.4, label='Min-Max Range')
+        plt.plot(all_epochs, mean_curve, label='Average', color='black', linestyle='--', linewidth=1.5)
+        plt.fill_between(all_epochs, lower_bound, upper_bound, color='blue', alpha=0.4, label=f'{margin_type.title()} Range')
 
-        colormap = cm.get_cmap('cividis', len(metrics))  # Use 'tab20' colormap for distinct colors
+        colormap = cm.get_cmap('cividis', len(metrics))
         for run_idx, run_metrics in enumerate(metrics):
-            plt.plot(epochs,
+            if smooth:
+                run_metrics = savgol_filter(run_metrics, smoothing_window, polyorder)
+            plt.plot(all_epochs,
                      run_metrics,
                      color=colormap(run_idx),
                      alpha=0.7,
                      linewidth=0.8,
-                     label=f'Run' if run_idx == 0 else '')
+                     linestyle=':',
+                     label=f'Runs' if run_idx == 0 else '')
 
         plt.xlabel("Epoch")
         plt.ylabel(ylabel)
+        plt.xlim(0, max_epochs-1)
+        plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True, nbins=max_epochs-1))  # Only integer ticks on x-axis
+
         if 'Accuracy' in title:
-            plt.ylim(0, 100)
-            plt.gca().yaxis.set_major_locator(plt.MultipleLocator(5))
+            plt.grid(visible=True, which='major', linestyle='-', linewidth=0.5, alpha=0.8, color='gray')  # Major grid
+            plt.grid(visible=True, which='minor', linestyle=':', linewidth=0.5, alpha=0.5, color='lightgray')  # Minor grid
+            plt.minorticks_on()
+            spacing = 0.5 if 'Validation' in title else 1
+            plt.gca().yaxis.set_major_locator(MultipleLocator(spacing))
             plt.legend(loc="lower right")
         elif 'Loss' in title:
             plt.ylim(bottom=0)
             plt.legend(loc="upper right")
-        plt.title(f"{title} for {domain}")
+        plt.title(f"{title} without {domain}")
 
         if save_path:
             save_name = f'{domain}_{metric_name}_plot'
@@ -148,7 +203,6 @@ def _plot_metric_curves(
             plt.show()
 
 
-# TODO: integrate into _plot_metric_curves function
 def _plot_all_domain_averages(
         run_data: Dict[str, List],
         metric_name: str,
@@ -157,34 +211,65 @@ def _plot_all_domain_averages(
         save_path=None,
         show: bool = True,
 ):
-    """Plot the average curves for each domain in a single plot, plus an overall average curve.
+    """
+    Plot the average curves for each domain in a single plot, plus an overall average curve.
+    Handles runs with varying epoch lengths by extending shorter runs.
+
     :param run_data: nested dictionary with run and domain data.
     :param metric_name: name of the metric to plot.
     :param ylabel: name of the y-axis label.
     :param title: title of the plot.
     :param save_path: path to save the figure. Default is None.
-    :return: None"""
+    :param show: whether to display the plot. Default is True.
+    :return: None
+    """
     fig = plt.figure(figsize=(10, 6))
 
+    max_epochs = max(
+        max(len(run['epoch']) for run in runs)
+        for runs in run_data.values()
+    )
+    all_epochs = np.arange(0, max_epochs)
+
     all_domain_means = []
-    epochs = run_data[list(run_data.keys())[0]][0]['epoch']  # gets epochs from the first domains first run
 
     for domain, runs in run_data.items():
-        metrics = np.array([run[metric_name].values for run in runs])
+        extended_metrics = []
+
+        for run in runs:
+            run_epochs = np.array(run['epoch'])
+            run_metrics = np.array(run[metric_name])
+
+            if len(run_epochs) < max_epochs:
+                missing_epochs = np.arange(len(run_epochs), max_epochs)
+                run_epochs = np.concatenate([run_epochs, missing_epochs])
+                last_metric = run_metrics[-1]
+                run_metrics = np.concatenate([run_metrics, [last_metric] * len(missing_epochs)])
+
+            extended_metrics.append(run_metrics)
+
+        metrics = np.vstack(extended_metrics)
+
         mean_curve = np.mean(metrics, axis=0)
         all_domain_means.append(mean_curve)
-        plt.plot(epochs, mean_curve, label=f"{domain} Average", alpha=0.7)
+
+        plt.plot(all_epochs, mean_curve, label=f"{domain} Average", alpha=0.7, linestyle="--")
 
     overall_mean_curve = np.mean(all_domain_means, axis=0)
-    plt.plot(epochs, overall_mean_curve, label="Overall Average", color="black", linewidth=2, linestyle="--")
+    plt.plot(all_epochs, overall_mean_curve, label="Overall Average", color="black", linewidth=2, linestyle="-")
 
     plt.xlabel("Epoch")
     plt.ylabel(ylabel)
     plt.title(f"Average {title} Across Domains")
+    plt.xlim(0, max_epochs-1)
+    plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True, nbins=max_epochs-1))
 
     if 'Accuracy' in title:
-        plt.ylim(0, 100)
-        plt.gca().yaxis.set_major_locator(plt.MultipleLocator(5))
+        plt.grid(visible=True, which='major', linestyle='-', linewidth=0.3, alpha=0.8)
+        plt.grid(visible=True, which='minor', linestyle=':', linewidth=0.5, alpha=0.5)
+        plt.minorticks_on()
+        spacing = 0.5 if 'Validation' in title else 1
+        plt.gca().yaxis.set_major_locator(MultipleLocator(spacing))
         plt.legend(loc="lower right")
     elif 'Loss' in title:
         plt.ylim(bottom=0)
@@ -202,9 +287,12 @@ def plot_training_curves(
         show: bool = True,
         save_path: str = None
 ) -> None:
-    """Plot the training curves for each domain.
-    :param base_dir: path to experiment directory.
-    :return: None"""
+    """
+    Plot the training curves for each domain.
+    :param base_dir: Path to experiment directory.
+    :param save_path: Path to save the figure. Default is None.
+    :return: None
+    """
     run_data = _load_run_data(base_dir)
 
     metrics = [

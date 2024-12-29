@@ -8,7 +8,7 @@ from ruamel.yaml import YAML
 
 from domgen.data import DOMAIN_NAMES, get_dataset
 from domgen.eval import plot_accuracies, plot_training_curves
-from domgen.models import train_model, get_model, get_optimizer, get_criterion, get_device
+from domgen.models import train_model, get_model, get_optimizer, get_criterion, get_device, delete_model_dirs
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,7 +26,7 @@ def main(args):
         torch.cuda.manual_seed(args.seed)
         torch.cuda.manual_seed_all(args.seed)
 
-    # override default args when config file is provided
+    # --- setup --- #
     if args.config:
         yaml = YAML(typ="safe")
         with open(args.config, "r") as f:
@@ -66,17 +66,20 @@ def main(args):
                    'best_validation_loss',
                    'best_validation_accuracy']
 
+    # --- loop over different seeds --- #
     for i in range(args.num_runs):
         args.experiment_number = i
         logger.info(f'RUNNING EXPERIMENT {i + 1}/{args.num_runs}')
         logger.info(f'TRAINING ON {device}.\n')
         logger.info('STARTING...')
 
+        # --- start training over domain splits --- #
         for idx, domain in enumerate(domains):
             args.domain_name = domain
             logger.info(f'LEAVE OUT {domain}.')
             logger.info(f'TRAINING FOR {args.epochs} EPOCHS.')
 
+            # --- setup --- #
             dataset = get_dataset(
                 name=args.dataset,
                 root_dir=args.dataset_dir,
@@ -107,6 +110,7 @@ def main(args):
                 eps=args.eps,
             )
 
+            # --- actual training happens here --- #
             training_metrics, test_metrics = train_model(
                 args=args,
                 model=model,
@@ -121,6 +125,7 @@ def main(args):
             logger.info(f'TEST LOSS: {test_metrics["Test Loss"]}')
             logger.info(f'TEST ACCURACY: {test_metrics["Test Accuracy"]}\n')
 
+            # --- log metrics to files --- #
             experiment_dir = os.path.join(f'{args.log_dir}/{args.experiment}/run_{i}/' + domain)
             if not os.path.exists(experiment_dir):
                 os.makedirs(experiment_dir)
@@ -137,6 +142,7 @@ def main(args):
 
         logger.info('FINISHED...')
 
+    # --- extract averages and log them to file --- #
     domain_names = []
     average_accuracies = []
     worst_case_accuracies = []
@@ -165,9 +171,18 @@ def main(args):
     logger.info(f'Overall Best Case Performance: {overall_best_case_performance}')
     logger.info(f'Saving plots to {args.log_dir}/{args.experiment}/plots/')
 
-    # create plots
+    # --- create plots --- #
     plot_training_curves(f'{args.log_dir}/{args.experiment}/', show=False)
     plot_accuracies(f'{args.log_dir}/{args.experiment}/results.csv', show=False)
+
+    # --- clean up --- #
+    if args.delete_checkpoints:
+        directory = f'{args.log_dir}/{args.experiment}'
+        if os.path.isdir(directory):
+            delete_model_dirs(directory)
+            logger.info("Completed deleting all 'model' directories.")
+        else:
+            logger.info("The provided path is not a valid directory.")
 
 
 if __name__ == '__main__':
@@ -193,6 +208,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_runs', type=int, default=10, help='Number of runs per experiment')
     parser.add_argument('--silent', action='store_true', default=False, help='silent mode')
     parser.add_argument('--config', type=str, default=None, help='config file')
+    parser.add_argument('--delete_checkpoints', action='store_true', default=True, help='delete checkpoints')
     args = parser.parse_args()
 
     main(args)

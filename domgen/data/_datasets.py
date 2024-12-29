@@ -2,12 +2,15 @@ import os
 from collections import defaultdict
 import random
 
-import torch
+import numpy as np
 import torchvision
+from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, ConcatDataset, Subset
 from torchvision.datasets import ImageFolder
 from domgen.augment import imagenet_transform
 from typing import Any
+from domgen.augment._transforms import combine_augmentations
+from domgen.augment._transforms import all_augmentations, pacs_aug, camelyon17_aug, shared_aug
 
 """To add a new dataset, just create a class that inherits from `DomainDataset`."""
 
@@ -33,7 +36,7 @@ class DomainDataset(MultiDomainDataset):
             self,
             root: str,
             test_domain: int,
-            augment: torchvision.transforms.Compose | Any = None,
+            augment: list[dict] = None,
             subset: float = None,
     ) -> None:
         """
@@ -49,13 +52,19 @@ class DomainDataset(MultiDomainDataset):
         self.domains = sorted([directory.name for directory in os.scandir(root) if directory.is_dir()])
         self.test_domain = test_domain
         self.subset = subset
+        self.data = []
+
         # base augment = ImageNet
         input_size = self.input_shape[-2], self.input_shape[-1]
         transform = imagenet_transform(input_size=input_size)
-        self.data = []
+
+        pipeline = None
+        if augment:
+            pipeline = combine_augmentations(augment)
+
         for i, domain in enumerate(self.domains):
-            if augment and (i != self.test_domain):
-                domain_transform = augment
+            if pipeline and (i != self.test_domain):
+                domain_transform = lambda img: pipeline(image=np.array(img))['image']
             else:
                 domain_transform = transform
 
@@ -102,22 +111,39 @@ class DomainDataset(MultiDomainDataset):
     def generate_loaders(
             self,
             batch_size: int = 32,
-            partition_size: float = 0.8,
+            test_size: float = 0.2,
+            stratify: bool = True,
     ) -> (DataLoader, DataLoader, DataLoader):
         """
         Generates DataLoaders for training and testing domains.
 
-        :param partition_size: Size of the training partition (default: 0.8). Validation size is equal to 1-training.
+        :param test_size: Size of the validation partition (default: 0.2).
         :param batch_size: Size of the batch. (default: 32)
+        :param stratify: Whether to stratify class distribution (default: True).
         :return: A tuple of DataLoaders for training, validation and testing.
         """
         train_domains = [domain for i, domain in enumerate(self.data) if i != self.test_domain]
-        train_partition = ConcatDataset(train_domains)
-        train_set, val_set = torch.utils.data.random_split(train_partition,
-                                                           [partition_size, 1 - partition_size])
+        train_subsets = []
+        val_subsets = []
+        for dom in train_domains:
+            targets = dom.targets
+            if stratify:
+                train_idx, valid_idx = train_test_split(
+                    np.arange(len(targets)), test_size=test_size, random_state=42, shuffle=True, stratify=targets
+                )
+            else:
+                train_idx, valid_idx = train_test_split(
+                    np.arange(len(targets)), test_size=test_size, random_state=42, shuffle=True
+                )
 
-        train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=True)
+            train_subsets.append(Subset(dom, train_idx))
+            val_subsets.append(Subset(dom, valid_idx))
+
+        train_split = ConcatDataset(train_subsets)
+        val_split = ConcatDataset(val_subsets)
+
+        train_loader = DataLoader(train_split, batch_size=batch_size, shuffle=True)
+        val_loader = DataLoader(val_split, batch_size=batch_size, shuffle=True)
         test_loader = DataLoader(self.data[self.test_domain], batch_size=batch_size, shuffle=True)
 
         return train_loader, val_loader, test_loader
@@ -126,7 +152,8 @@ class DomainDataset(MultiDomainDataset):
 def get_dataset(
         name: str,
         root_dir: str,
-        test_domain: int
+        test_domain: int,
+        **kwargs,
 ) -> DomainDataset:
     """
     Gets a domain dataset from a given name.
@@ -136,9 +163,9 @@ def get_dataset(
     :return:
     """
     if name == 'PACS':
-        return PACS(root_dir, test_domain=test_domain)
+        return PACS(root_dir, test_domain=test_domain, **kwargs)
     if name == 'camelyon17':
-        return Camelyon17(root_dir, test_domain=test_domain)
+        return Camelyon17(root_dir, test_domain=test_domain, **kwargs)
 
 
 """Insert new datasets below."""
@@ -148,15 +175,15 @@ class PACS(DomainDataset):
     domains = DOMAIN_NAMES['PACS']
     input_shape = (3, 244, 244)
 
-    def __init__(self, root, test_domain):
+    def __init__(self, root, test_domain, **kwargs):
         self.dir = os.path.join(root, "PACS/")
-        super().__init__(self.dir, test_domain, augment=None)
+        super().__init__(self.dir, test_domain, augment=[pacs_aug, shared_aug])
 
 
 class Camelyon17(DomainDataset):
     domains = DOMAIN_NAMES['camelyon17']
     input_shape = (3, 96, 96)
 
-    def __init__(self, root, test_domain):
+    def __init__(self, root, test_domain, **kwargs):
         self.dir = os.path.join(root, "camelyon17/")
-        super().__init__(self.dir, test_domain, augment=None, subset=0.2)
+        super().__init__(self.dir, test_domain, augment=[camelyon17_aug, shared_aug], subset=0.2)
