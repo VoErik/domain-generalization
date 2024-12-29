@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader, ConcatDataset, Subset
 from torchvision.datasets import ImageFolder
 from domgen.augment import imagenet_transform
 from typing import Any
-from domgen.augment._transforms import combine_augmentations
+from domgen.augment._transforms import combine_augmentations, create_augmentation_pipeline
 from domgen.augment._transforms import all_augmentations, pacs_aug, camelyon17_aug, shared_aug
 
 """To add a new dataset, just create a class that inherits from `DomainDataset`."""
@@ -36,7 +36,7 @@ class DomainDataset(MultiDomainDataset):
             self,
             root: str,
             test_domain: int,
-            augment: list[dict] = None,
+            augment: dict = None,
             subset: float = None,
     ) -> None:
         """
@@ -60,11 +60,11 @@ class DomainDataset(MultiDomainDataset):
 
         pipeline = None
         if augment:
-            pipeline = combine_augmentations(augment)
+            pipeline = create_augmentation_pipeline(augment)
 
         for i, domain in enumerate(self.domains):
             if pipeline and (i != self.test_domain):
-                domain_transform = lambda img: pipeline(image=np.array(img))['image']
+                domain_transform = pipeline
             else:
                 domain_transform = transform
 
@@ -177,7 +177,7 @@ class PACS(DomainDataset):
 
     def __init__(self, root, test_domain, **kwargs):
         self.dir = os.path.join(root, "PACS/")
-        super().__init__(self.dir, test_domain, augment=[pacs_aug, shared_aug])
+        super().__init__(self.dir, test_domain, augment=pacs_aug)
 
 
 class Camelyon17(DomainDataset):
@@ -186,4 +186,4 @@ class Camelyon17(DomainDataset):
 
     def __init__(self, root, test_domain, **kwargs):
         self.dir = os.path.join(root, "camelyon17/")
-        super().__init__(self.dir, test_domain, augment=[camelyon17_aug, shared_aug], subset=0.2)
+        super().__init__(self.dir, test_domain, augment=camelyon17_aug, subset=0.2)
