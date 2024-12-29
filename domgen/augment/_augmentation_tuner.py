@@ -10,7 +10,6 @@ from ray.train import Checkpoint
 from ray.tune.schedulers import ASHAScheduler
 from ruamel.yaml import YAML
 
-from domgen.data import get_dataset
 from domgen.models import train_epoch, validate, get_device, get_model, get_criterion, get_optimizer
 from domgen.models._tuning import Tuner
 
@@ -59,6 +58,7 @@ class AugmentationTuner(Tuner):
                 pass
             augmentation = None
 
+            from domgen.data import get_dataset
             dataset = get_dataset(
                 root_dir=self.base_config["datadir"], name=self.base_config["dataset"],
                 test_domain=self.base_config["test_domain"], augmentation=augmentation,

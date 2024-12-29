@@ -9,7 +9,6 @@ from ray.air import RunConfig, Result
 from ray.train import Checkpoint
 from ray.tune.schedulers import ASHAScheduler
 from ruamel.yaml import YAML
-from domgen.data import get_dataset
 from domgen.models import get_model, get_criterion, get_optimizer, get_device, train_epoch, validate
 
 
@@ -99,6 +98,7 @@ class ParamTuner(Tuner):
             optimizer = get_optimizer(
                 conf["optimizer"], model.parameters(), lr=conf["lr"]
             )
+            from domgen.data import get_dataset
             dataset = get_dataset(
                 root_dir=self.base_config["datadir"], name=self.base_config["dataset"],
                 test_domain=self.base_config["test_domain"]
