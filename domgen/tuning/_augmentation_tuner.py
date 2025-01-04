@@ -10,8 +10,8 @@ from ray.train import Checkpoint
 from ray.tune.schedulers import ASHAScheduler
 from ruamel.yaml import YAML
 
-from domgen.models import train_epoch, validate, get_device, get_model, get_criterion, get_optimizer
-from domgen.models._tuning import Tuner
+from domgen.models import get_device, get_model, get_criterion, get_optimizer
+from domgen.tuning._base_tuner import Tuner
 
 
 class AugmentationTuner(Tuner):
