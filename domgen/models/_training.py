@@ -1,15 +1,18 @@
+import json
 import os
+import pprint
 from datetime import datetime
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Optional
+
+import pandas as pd
 import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import logging
 from ._utils import EarlyStopping
-
-# remember to set tensorboard logdir to experiments
-logdir = 'experiments'
+from ._model_config import get_device, get_model, get_criterion, get_optimizer
+from ..data import DOMAIN_NAMES, get_dataset
 
 logging.basicConfig(
     level=logging.INFO,
@@ -20,333 +23,343 @@ logging.basicConfig(
 )
 logger = logging.getLogger('Experiment Logger')
 
-def save_checkpoint(state, filename):
-    torch.save(state, filename)
 
-def train_model(
-        args,
+def _checkpointing(
         model: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
-        criterion: torch.nn.Module,
-        train_loader: torch.utils.data.DataLoader,
-        val_loader: torch.utils.data.DataLoader,
-        test_loader: torch.utils.data.DataLoader,
-        tensorboard: bool = True,
-        device: str = 'cpu',
-) -> Tuple[list[dict[str, float | int]], dict[str, float]]:
+        epoch: int,
+        val_accuracy: float,
+        best_val_accuracy: float,
+        checkpoint_dir: str,
+        is_last: bool = False,
+) -> float:
     """
-    Training function. Runs the training and validation functions and tests the model afterwards on the holdout set.
-    :param args: Command line + configuration arguments.
-    :param model: Model instance to train.
-    :param optimizer: Optimizing algorithm.
-    :param criterion: Loss function
-    :param train_loader: Training data loader.
-    :param val_loader: Validation data loader.
-    :param test_loader: Test data loader.
-    :param tensorboard: Whether to log the run with tensorboard. Default: True.
-    :param device: Device to train on.
-    :return: Training and testing metrics.
-    """
+    Save and manage checkpoints during training.
 
-    train_writer, test_writer = None, None
-    if tensorboard:
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        train_writer = SummaryWriter(
-            f'{args.log_dir}/{args.experiment}/run_{args.experiment_number}/{args.domain_name}/train_{timestamp}'
-        )
-        test_writer = SummaryWriter(
-            f'{args.log_dir}/{args.experiment}/run_{args.experiment_number}/{args.domain_name}/test_{timestamp}'
-        )
-
-    training_metrics = _training(args,
-                                 model=model,
-                                 optimizer=optimizer,
-                                 criterion=criterion,
-                                 num_epochs=args.epochs,
-                                 device=device,
-                                 train_loader=train_loader,
-                                 val_loader=val_loader,
-                                 tb_writer=train_writer, )
-
-    test_metrics = test(args=args,
-                        model=model,
-                        criterion=criterion,
-                        device=device,
-                        test_loader=test_loader,
-                        tb_writer=test_writer)
-
-    return training_metrics, test_metrics
-
-
-def train_epoch(
-        args,
-        model: torch.nn.Module,
-        optimizer: torch.optim.Optimizer,
-        criterion: torch.nn.Module,
-        train_loader: torch.utils.data.DataLoader,
-        device: str,
-        tb_writer: SummaryWriter = None,
-        epoch: int = None,
-        scheduler = None
-) -> Tuple[float, float]:
-    """
-    Runs a training epoch.
-    :param args: Namespace arguments.
-    :param model: Instance of nn.Module
-    :param optimizer: Optimizing algorithm.
-    :param criterion: Loss function.
-    :param train_loader: Training data loader.
-    :param device: CPU, CUDA, MPS
-    :param tb_writer: Tensorboard summary writer.
+    :param model: Model instance.
+    :param optimizer: Optimizer instance.
     :param epoch: Current epoch.
-    :return: Tuple of loss and accuracy.
+    :param val_accuracy: Validation accuracy for the current epoch.
+    :param best_val_accuracy: Best validation accuracy so far.
+    :param checkpoint_dir: Directory to save checkpoints.
+    :param is_last: Whether this is the final checkpoint for the model.
+    :return: Updated best validation accuracy.
     """
-    model.train()
-    running_loss = 0.0
-    correct_predictions = 0
-    total_predictions = 0
+    checkpoint = {
+        "epoch": epoch,
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "val_accuracy": val_accuracy,
+    }
+
+    if is_last:
+        last_model_path = f"{checkpoint_dir}/last.pth"
+        torch.save(checkpoint, last_model_path)
+        logger.info(f"Last model checkpoint saved at {last_model_path}")
+    elif val_accuracy > best_val_accuracy:
+        best_val_accuracy = val_accuracy
+        best_model_path = f"{checkpoint_dir}/best.pth"
+        torch.save(checkpoint, best_model_path)
+        logger.info(f"Best model checkpoint saved with accuracy: {best_val_accuracy:.2f}%")
+
+    return best_val_accuracy
 
 
-    with tqdm(train_loader, unit='batch', disable=args.silent) as batch:
-        for i, (inputs, labels) in enumerate(batch):
-            if not args.silent:
-                batch.set_description(f'Epoch {epoch}')
-            inputs, labels = inputs.to(device), labels.to(device)
+class DomGenTrainer:
+    def __init__(
+            self,
+            model: str,
+            optimizer: str,
+            criterion: str,
+            dataset: str,
+            strategy: str = 'leave one out',
+            num_experiments: int = 1,
+            epochs_per_experiment: int = 10,
+            device: str = None,
+            use_early_stopping: bool = True,
+            use_scheduling: bool = True,
+            patience: int = 5,
+            delta: float = 0.1,
+            log_dir: str = 'experiments',
+            checkpoint_dir: str = 'checkpoints',
+            silent: bool = False,
+            **kwargs
+    ) -> None:
+        self.model = model
+        self.optimizer = optimizer
+        self.criterion = criterion
+        self.dataset = dataset
+        self.strategy = strategy
+        self.num_experiments = num_experiments
+        self.epochs_per_experiment = epochs_per_experiment
+        self.device = device if device else get_device()
+        self.use_early_stopping = use_early_stopping
+        self.use_scheduling = use_scheduling
+        self.patience = patience
+        self.delta = delta
+        self.log_dir = log_dir
+        self.silent = silent
 
-            optimizer.zero_grad()
+        os.makedirs(f'{self.log_dir}/{checkpoint_dir}', exist_ok=True)
+        self.checkpoint_dir = f'{self.log_dir}/{checkpoint_dir}'
+        self.args = kwargs
 
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
+        self.domains = DOMAIN_NAMES[self.dataset]
+        self.metrics = {}
+        self.train_metrics = {}
+        self.test_metrics = {}
 
+        self.current_experiment = -1
+        if use_early_stopping:
+            self.early_stopping = EarlyStopping(
+                patience=self.patience,
+                delta=self.delta,
+                mode='min'
+            )
 
-            predictions = outputs.argmax(dim=1, keepdim=True).squeeze()
-            correct = (predictions == labels).sum().item()
-            correct_predictions += correct
-            total_predictions += labels.size(0)
+    def fit(self):
+        for run in range(self.num_experiments):
+            self.current_experiment += 1
+            logger.info(f"RUNNING EXPERIMENT {self.current_experiment + 1}/{self.num_experiments}")
+            logger.info(f"TRAINING ON {self.device}.\n")
 
-            running_loss += loss.item()
-            denominator = len(predictions) if predictions.dim() != 0 else 1
-            accuracy = correct / denominator
-            if not args.silent:
-                batch.set_postfix(loss=loss.item(), accuracy=100. * accuracy)
+            for idx, domain in enumerate(self.domains):
+                logger.info(f"LEAVE OUT DOMAIN: {domain}.")
+                model, criterion, optimizer, train_loader, val_loader, test_loader = self._prepare_domain(idx)
+                metrics, test_metrics = self.train_model(
+                    model=model,
+                    criterion=criterion,
+                    optimizer=optimizer,
+                    train_loader=train_loader,
+                    val_loader=val_loader,
+                    test_loader=test_loader,
+                )
+                self.train_metrics[domain] = metrics
+                self.test_metrics[domain] = test_metrics
+                logger.info(f"TEST LOSS: {test_metrics['Test Loss']}")
+                logger.info(f"TEST ACCURACY: {test_metrics['Test Accuracy']}\n")
+                self.early_stopping.reset()
 
-    avg_loss = running_loss / len(train_loader)
-    avg_accuracy = 100. * correct_predictions / total_predictions
+            if run not in self.metrics:
+                self.metrics[run] = {}
+            self.metrics[run]['train'] = self.train_metrics
+            self.metrics[run]['test'] = self.test_metrics
 
-    if tb_writer is not None:
-        tb_writer.add_scalar('Loss/train', avg_loss, epoch)
-        tb_writer.add_scalar('Accuracy/train', avg_accuracy, epoch)
+    def _run_epoch(
+            self,
+            mode: str,
+            model: torch.nn.Module,
+            loader: torch.utils.data.DataLoader,
+            criterion: torch.nn.Module,
+            optimizer: Optional[torch.optim.Optimizer] = None,
+            tb_writer: Optional[SummaryWriter] = None,
+            epoch: Optional[int] = None,
+            scheduler=None,
+    ) -> Tuple[float, float]:
+        """
+            Generic method for training, validation, and testing.
+            :param mode: 'train', 'val', or 'test'
+            :param model: Model instance.
+            :param loader: DataLoader instance for the respective set.
+            :param criterion: Loss function.
+            :param optimizer: Optimizer (only used for training).
+            :param tb_writer: Tensorboard writer (optional).
+            :param epoch: Current epoch (optional, used for training).
+            :param scheduler: Learning rate scheduler (optional, used for validation).
+            :return: Tuple of average loss and accuracy.
+            """
+        is_train = mode == 'train'
+        model.train() if is_train else model.eval()
 
-    print(f"Epoch [{epoch}] - Loss: {avg_loss:.4f}, Accuracy: {avg_accuracy:.2f}%")
+        total_loss = 0.0
+        correct_predictions = 0
+        total_predictions = 0
 
-    return avg_loss, avg_accuracy
+        with tqdm(loader, desc=mode.capitalize(), unit="batch", disable=self.silent) as batch:
+            for inputs, labels in batch:
+                if mode == 'test':
+                    inputs, labels = inputs.to(self.device), labels.to(self.device)
+                else:
+                    inputs, labels = inputs['image'].to(self.device), labels.to(self.device)
 
+                if is_train:
+                    optimizer.zero_grad()
 
-def validate(
-        args,
-        model: torch.nn.Module,
-        val_loader: torch.utils.data.DataLoader,
-        criterion: torch.nn.Module,
-        device: str,
-        tb_writer: SummaryWriter = None,
-        scheduler = None
-) -> Tuple[float, float]:
-    """
-    Runs the model on the validation set and calculates loss and accuracy across all batches.
-    :param model: Instance of nn.Module
-    :param val_loader: Validation data loader.
-    :param criterion: Loss function.
-    :param device: CPU, CUDA, MPS
-    :param tb_writer: Tensorboard summary writer.
-    :return: Tuple of loss and accuracy.
-    """
-    model.eval()
-    val_loss = 0.0
-    correct_predictions = 0
-    total_predictions = 0
+                with torch.set_grad_enabled(is_train):
+                    outputs = model(inputs)
+                    loss = criterion(outputs, labels)
 
-    with tqdm(val_loader, unit='batch', desc='Validation', disable=args.silent) as batch:
-        for inputs, labels in batch:
-            inputs, labels = inputs.to(device), labels.to(device)
+                    if is_train:
+                        loss.backward()
+                        optimizer.step()
 
-            with torch.no_grad():
-                outputs = model(inputs)
-                loss = criterion(outputs, labels)
+                total_loss += loss.item() * inputs.size(0)
+                predictions = outputs.argmax(dim=1)
+                correct_predictions += (predictions == labels).sum().item()
+                total_predictions += labels.size(0)
 
-            val_loss += loss.item() * inputs.size(0)
-            _, predicted = torch.max(outputs, 1)
-            correct_predictions += (predicted == labels).sum().item()
-            total_predictions += labels.size(0)
+        avg_loss = total_loss / total_predictions
+        avg_accuracy = 100.0 * correct_predictions / total_predictions
 
-            batch_accuracy = correct_predictions / total_predictions
-            if not args.silent:
-                batch.set_postfix(loss=loss.item(), accuracy=100. * batch_accuracy)
+        if tb_writer:
+            tb_writer.add_scalar(f'Loss/{mode}', avg_loss, epoch or 0)
+            tb_writer.add_scalar(f'Accuracy/{mode}', avg_accuracy, epoch or 0)
 
-    avg_loss = val_loss / total_predictions
-    avg_accuracy = 100. * correct_predictions / total_predictions
+        if mode == 'val' and scheduler:
+            scheduler.step(avg_loss)
 
-    if scheduler:
-        scheduler.step(avg_loss)
+        return avg_loss, avg_accuracy
 
-    if tb_writer is not None:
-        tb_writer.add_scalar('Loss/val', avg_loss, 1)
-        tb_writer.add_scalar('Accuracy/val', avg_accuracy, 1)
+    def train_model(
+            self,
+            model: torch.nn.Module,
+            optimizer: torch.optim.Optimizer,
+            criterion: torch.nn.Module,
+            train_loader: torch.utils.data.DataLoader,
+            val_loader: torch.utils.data.DataLoader,
+            test_loader: torch.utils.data.DataLoader,
+    ) -> Tuple[List[dict], dict]:
+        train_writer, val_writer, test_writer = self._setup_tb_writers(self.log_dir)
 
-    print(f'Validation - Loss: {avg_loss:.4f}, Accuracy: {avg_accuracy:.2f}%')
+        metrics_summary = []
+        scheduler = ReduceLROnPlateau(optimizer, patience=self.patience) if self.use_scheduling else None
+        best_val_accuracy = 0.0
 
-    return avg_loss, avg_accuracy
+        for epoch in range(self.epochs_per_experiment):
+            train_loss, train_acc = self._run_epoch(
+                mode="train",
+                model=model,
+                loader=train_loader,
+                criterion=criterion,
+                optimizer=optimizer,
+                tb_writer=train_writer,
+                epoch=epoch,
+            )
+            val_loss, val_acc = self._run_epoch(
+                mode="val",
+                model=model,
+                loader=val_loader,
+                criterion=criterion,
+                tb_writer=val_writer,
+                epoch=epoch,
+                scheduler=scheduler,
+            )
 
+            metrics = {
+                "epoch": epoch,
+                "train_loss": train_loss,
+                "train_accuracy": train_acc,
+                "val_loss": val_loss,
+                "val_accuracy": val_acc,
+            }
+            metrics_summary.append(metrics)
+            pprint.pprint(metrics)
 
-def test(
-        args,
-        model: torch.nn.Module,
-        test_loader: torch.utils.data.DataLoader,
-        criterion: torch.nn.Module,
-        device: str,
-        tb_writer: SummaryWriter = None,
-) -> Dict[str, float]:
-    """
-    Runs the model on the test set and calculates the average test loss and accuracy for the test set.
-    :param model: Model (instance of nn.Module)
-    :param test_loader: Test data loader.
-    :param criterion: Loss function.
-    :param device: CPU, CUDA, MPS
-    :param tb_writer: Summary Writer for Tensorboard.
-    :return: Dict with Test Loss and Test Accuracy
-    """
-    model.eval()
-    test_loss = 0.0
-    correct_predictions = 0
-    total_predictions = 0
+            last_epoch = True if epoch == self.epochs_per_experiment - 1 else False
+            best_val_accuracy = _checkpointing(
+                model=model,
+                optimizer=optimizer,
+                epoch=epoch,
+                val_accuracy=val_acc,
+                best_val_accuracy=best_val_accuracy,
+                checkpoint_dir=self.checkpoint_dir,
+                is_last=last_epoch
+            )
 
-    with tqdm(test_loader, unit='batch', desc='Testing', disable=args.silent) as batch:
-        for inputs, labels in batch:
-            inputs, labels = inputs.to(device), labels.to(device)
+            self.early_stopping(
+                score=val_loss,
+                epoch=epoch,
+                model=model,
+                optimizer=optimizer,
+                checkpoint_path=f"{self.checkpoint_dir}/best.pth"
 
-            with torch.no_grad():
-                outputs = model(inputs)
-                loss = criterion(outputs, labels)
+            )
+            if self.early_stopping.stop:
+                print(f"Training stopped early at epoch {epoch + 1}.")
+                break
 
-            test_loss += loss.item() * inputs.size(0)
-            _, predicted = torch.max(outputs, 1)
-            correct_predictions += (predicted == labels).sum().item()
-            total_predictions += labels.size(0)
+        best_model_path = f"{self.checkpoint_dir}/best.pth"
+        logger.info(f"Loading best model for testing from {best_model_path}")
+        checkpoint = torch.load(best_model_path, map_location=self.device, weights_only=True)
+        model.load_state_dict(checkpoint["model_state_dict"])
 
-            batch_accuracy = correct_predictions / total_predictions
-            if not args.silent:
-                batch.set_postfix(loss=loss.item(), accuracy=100. * batch_accuracy)
-
-    avg_loss = test_loss / total_predictions
-    avg_accuracy = 100. * correct_predictions / total_predictions
-
-    if tb_writer is not None:
-        tb_writer.add_scalars('Test Loss and Accuracy',
-                              {'Loss': avg_loss, 'Accuracy': avg_accuracy},
-                              1)
-        tb_writer.flush()
-    return {'Test Loss': avg_loss, 'Test Accuracy': avg_accuracy}
-
-
-def _training(
-        args,
-        model: torch.nn.Module,
-        optimizer: torch.optim.Optimizer,
-        criterion,
-        num_epochs: int,
-        device: str,
-        train_loader,
-        val_loader,
-        tb_writer=None,
-) -> List[dict[str, float | int]]:
-    """Training loop. Trains the model and evaluates on the validation set.
-    :param model: Model to train.
-    :param optimizer: Torch optimizer to train.
-    :param criterion: Loss function.
-    :param num_epochs: Number of epochs.
-    :param device: Device to train the model on.
-    :param train_loader: Training dataloader.
-    :param val_loader: Validation dataloader.
-    :return: Average loss and accuracy of the epoch.
-    """
-
-    best_vloss = float('inf')
-    best_vacc = 0.0
-    metrics_summary = []
-    save_path = f'{args.log_dir}/{args.experiment}/run_{args.experiment_number}/{args.domain_name}/models'
-    os.makedirs(save_path, exist_ok=True)
-    early_stopping = None
-    if args.use_early_stopping:
-        early_stopping= EarlyStopping(patience=2*args.patience)
-
-    scheduler = None
-    if args.use_scheduling:
-        scheduler = ReduceLROnPlateau(optimizer, patience=args.patience)
-
-    for epoch in range(num_epochs):
-        logger.info(f'EPOCH {epoch + 1}:')
-        print('Last LR: ', scheduler.get_last_lr())
-        avg_loss, avg_accuracy = train_epoch(
-            args=args,
-            epoch=epoch,
-            tb_writer=tb_writer,
+        test_metrics = self._run_epoch(
+            mode="test",
             model=model,
+            loader=test_loader,
             criterion=criterion,
-            optimizer=optimizer,
-            train_loader=train_loader,
-            device=device,
+            tb_writer=test_writer,
         )
+        return metrics_summary, {"Test Loss": test_metrics[0], "Test Accuracy": test_metrics[1]}
 
-        avg_vloss, avg_vaccuracy = validate(
-            args=args,
-            tb_writer=tb_writer,
-            model=model,
-            criterion=criterion,
-            val_loader=val_loader,
-            device=device,
-            scheduler=scheduler,
+    def _prepare_domain(
+            self,
+            idx: int
+    ) -> Tuple:
+        dataset = get_dataset(
+            name=self.dataset,
+            root_dir=self.args["dataset_dir"],
+            test_domain=idx,
+            augment=self.args["augment"],
         )
+        train_loader, val_loader, test_loader = dataset.generate_loaders(
+            batch_size=self.args["batch_size"]
+        )
+        model = get_model(self.model, dataset.num_classes).to(self.device)
+        criterion = get_criterion(self.criterion)
+        optimizer = get_optimizer(
+            optimizer_name=self.optimizer,
+            model_parameters=model.parameters(),
+            **self.args,
+        )
+        return model, criterion, optimizer, train_loader, val_loader, test_loader
 
-        logger.info(f'LOSS: TRAIN: {avg_loss} VAL: {avg_vloss}')
-        logger.info(f'ACCURACY: TRAIN: {avg_accuracy} VAL: {avg_vaccuracy}\n')
+    def _setup_tb_writers(
+            self,
+            log_dir: str
+    ) -> Tuple[Optional[SummaryWriter], Optional[SummaryWriter], Optional[SummaryWriter]]:
+        if not self.args.get("tensorboard", False):
+            return None, None, None
 
-        if tb_writer is not None:
-            tb_writer.add_scalars('Training vs. Validation Loss',
-                                  {'Training': avg_loss, 'Validation': avg_vloss},
-                                  epoch + 1)
-            tb_writer.flush()
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        train_writer = SummaryWriter(f"{log_dir}/train_{timestamp}")
+        val_writer = SummaryWriter(f"{log_dir}/val_{timestamp}")
+        test_writer = SummaryWriter(f"{log_dir}/test_{timestamp}")
+        return train_writer, val_writer, test_writer
 
-        if avg_vaccuracy > best_vacc:
-            best_vacc = avg_vaccuracy
-        if avg_vloss < best_vloss:
-            best_vloss = avg_vloss
-            save_checkpoint({'epoch': epoch + 1,
-                             'model_state_dict': model.state_dict(),
-                             'optimizer_state_dict': optimizer.state_dict(),
-                             'loss': avg_vloss,
-                             'accuracy': avg_vaccuracy},
-                            os.path.join(save_path, 'best.pth'))
-            logger.info(f'Best model saved at epoch {epoch + 1}')
+    def print_metrics(self):
+        print('\nTRAINING METRICS')
+        pprint.pprint(self.train_metrics)
+        print('\nTEST METRICS')
+        pprint.pprint(self.test_metrics)
 
+    @classmethod
+    def save_metrics(cls, metrics, base_log_dir):
+        """
+        Converts the metrics dictionary to separate DataFrames for each domain and run, then saves them to CSV files.
+        :param metrics: The metrics dictionary containing the metrics for each run.
+        :param base_log_dir: The base directory where the run folders should be created.
+        """
+        for run_idx, run_metrics in metrics.items():
+            run_folder = os.path.join(base_log_dir, f'run_{run_idx}')
+            os.makedirs(run_folder, exist_ok=True)
 
-        metrics = {
-            'epoch': epoch,
-            'avg_training_loss': avg_loss,
-            'avg_validation_loss': avg_vloss,
-            'avg_training_accuracy': avg_accuracy,
-            'avg_validation_accuracy': avg_vaccuracy,
-            'best_validation_accuracy': best_vacc,
-            'best_validation_loss': best_vloss
-        }
-        metrics_summary.append(metrics)
-        save_checkpoint({'epoch': epoch + 1,
-                         'model_state_dict': model.state_dict(),
-                         'optimizer_state_dict': optimizer.state_dict(),
-                         'loss': avg_vloss},
-                        os.path.join(save_path, 'last.pth'))
-        early_stopping(best_vloss)
-        if early_stopping and early_stopping.stop:
-            break
+            for domain in run_metrics['train'].keys():
+                train_df = pd.DataFrame(run_metrics['train'][domain])
+                train_file = f'{domain}_train_metrics.csv'
+                train_df.to_csv(os.path.join(run_folder, train_file), index=False)
 
-    return metrics_summary
+                test_metrics = run_metrics['test'].get(domain, {})
+                test_df = pd.DataFrame([test_metrics])
+                test_file = f'{domain}_test_metrics.csv'
+                test_df.to_csv(os.path.join(run_folder, test_file), index=False)
+
+                print(f'Saved training metrics for {domain} in {run_folder}/{train_file}')
+                print(f'Saved testing metrics for {domain} in {run_folder}/{test_file}')
+
+    def save_config(self, filename):
+        config = vars(self)
+
+        with open(filename, 'w') as f:
+            json.dump(config, f, indent=4)
+        print(f"Configuration saved to {filename}")
