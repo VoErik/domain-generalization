@@ -1,6 +1,6 @@
 import argparse
-from domgen.models import ParamTuner
-from domgen.augment import AugmentationTuner
+from domgen.tuning import ParamTuner
+from domgen.tuning import AugmentationTuner
 
 
 if __name__ == '__main__':
