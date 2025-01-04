@@ -144,7 +144,7 @@ class DomainDataset(MultiDomainDataset):
 
         train_loader = DataLoader(train_split, batch_size=batch_size, shuffle=True)
         val_loader = DataLoader(val_split, batch_size=batch_size, shuffle=True)
-        test_loader = DataLoader(self.data[self.test_domain], batch_size=batch_size, shuffle=True)
+        test_loader = DataLoader(self.data[self.test_domain], batch_size=batch_size, shuffle=False)
 
         return train_loader, val_loader, test_loader
 
@@ -177,7 +177,8 @@ class PACS(DomainDataset):
 
     def __init__(self, root, test_domain, **kwargs):
         self.dir = os.path.join(root, "PACS/")
-        super().__init__(self.dir, test_domain, augment=pacs_aug)
+        self.aug = kwargs.get('augment', pacs_aug)
+        super().__init__(self.dir, test_domain, augment=self.aug)
 
 
 class Camelyon17(DomainDataset):
