@@ -11,10 +11,10 @@ from ray.tune.schedulers import ASHAScheduler
 from ruamel.yaml import YAML
 
 from domgen.models import get_device, get_model, get_criterion, get_optimizer
-from domgen.tuning._base_tuner import Tuner
+from domgen.tuning._base_tuner import BaseTuner
 
 
-class AugmentationTuner(Tuner):
+class AugmentationTuner(BaseTuner):
     """
     AugmentationTuner class for fine-tuning data augmentations.
     Integrates into the albumentations pipeline.

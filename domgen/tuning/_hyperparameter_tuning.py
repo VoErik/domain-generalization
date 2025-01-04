@@ -10,10 +10,10 @@ from ray.train import Checkpoint
 from ray.tune.schedulers import ASHAScheduler
 from ruamel.yaml import YAML
 from domgen.models import get_model, get_criterion, get_optimizer, get_device
-from domgen.tuning._base_tuner import Tuner
+from domgen.tuning._base_tuner import BaseTuner
 
 
-class ParamTuner(Tuner):
+class ParamTuner(BaseTuner):
     def __init__(self, base_config, tune_config, **kwargs):
         super().__init__(**kwargs)
         yaml = YAML(typ="safe")

@@ -1,4 +1,4 @@
-class Tuner:
+class BaseTuner:
     """
     Base tuner class for both hyperparameter tuning and augmentation tuning.
     :param trial_dir: Directory to save the trials in. Default: trials.
