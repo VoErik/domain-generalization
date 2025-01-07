@@ -1,6 +1,7 @@
 import torch
 import torch.optim as optim
 import torch.nn as nn
+from domgen.models import resnet18
 
 
 def get_optimizer(
@@ -96,6 +97,10 @@ def get_model(
     if model_name not in models_dict:
         raise ValueError(f"Model '{model_name}' not recognized. "
                          f"Available options: {list(models_dict.keys())}")
+
+    if model_name == "ResNet18":
+        model = resnet18(num_classes=num_classes, pretrained=pretrained)
+        return model
 
     if pretrained:
         model = models_dict[model_name](weights='DEFAULT')
