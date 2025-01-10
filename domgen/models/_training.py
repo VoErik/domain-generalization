@@ -13,6 +13,8 @@ import logging
 from ._utils import EarlyStopping
 from ._model_config import get_device, get_model, get_criterion, get_optimizer
 from ..data import DOMAIN_NAMES, get_dataset
+from domgen.eval import get_features_with_reduction, visualize_features_by_block, reduce_features_by_block
+from ._mixstyle import run_with_mixstyle, run_without_mixstyle
 
 logging.basicConfig(
     level=logging.INFO,
@@ -81,6 +83,7 @@ class DomGenTrainer:
             patience: int = 5,
             delta: float = 0.1,
             log_dir: str = 'experiments',
+            experiment: str = 'exp',
             checkpoint_dir: str = 'checkpoints',
             silent: bool = False,
             **kwargs
@@ -98,6 +101,7 @@ class DomGenTrainer:
         self.patience = patience
         self.delta = delta
         self.log_dir = log_dir
+        self.experiment = experiment
         self.silent = silent
 
         os.makedirs(f'{self.log_dir}/{checkpoint_dir}', exist_ok=True)
@@ -144,6 +148,19 @@ class DomGenTrainer:
                 self.metrics[run] = {}
             self.metrics[run]['train'] = self.train_metrics
             self.metrics[run]['test'] = self.test_metrics
+            self.train_metrics = {}
+            self.test_metrics = {}
+            if self.args.get('visualize_latent', 0):
+                block_features, labels = get_features_with_reduction(
+                    model, train_loader, self.device, reduction='avg_pool'
+                )
+                reduced_block_features = reduce_features_by_block(
+                    block_features, method='tsne', n_components=2
+                )
+                latent_path = os.path.join(self.log_dir, self.experiment, f'run_{run}', 'plots')
+                os.makedirs(latent_path, exist_ok=True)
+                visualize_features_by_block(
+                    reduced_block_features, labels, savepath=latent_path)
 
     def _run_epoch(
             self,
@@ -170,7 +187,7 @@ class DomGenTrainer:
             """
         is_train = mode == 'train'
         model.train() if is_train else model.eval()
-
+        print(f'Status {mode}: ', model.mixstyle._active)
         total_loss = 0.0
         correct_predictions = 0
         total_predictions = 0
@@ -222,28 +239,30 @@ class DomGenTrainer:
         train_writer, val_writer, test_writer = self._setup_tb_writers(self.log_dir)
 
         metrics_summary = []
-        scheduler = ReduceLROnPlateau(optimizer, patience=self.patience) if self.use_scheduling else None
+        scheduler = ReduceLROnPlateau(optimizer, patience=self.patience//2) if self.use_scheduling else None
         best_val_accuracy = 0.0
 
         for epoch in range(self.epochs_per_experiment):
-            train_loss, train_acc = self._run_epoch(
-                mode="train",
-                model=model,
-                loader=train_loader,
-                criterion=criterion,
-                optimizer=optimizer,
-                tb_writer=train_writer,
-                epoch=epoch,
-            )
-            val_loss, val_acc = self._run_epoch(
-                mode="val",
-                model=model,
-                loader=val_loader,
-                criterion=criterion,
-                tb_writer=val_writer,
-                epoch=epoch,
-                scheduler=scheduler,
-            )
+            with run_with_mixstyle(model, mix="random"):
+                train_loss, train_acc = self._run_epoch(
+                    mode="train",
+                    model=model,
+                    loader=train_loader,
+                    criterion=criterion,
+                    optimizer=optimizer,
+                    tb_writer=train_writer,
+                    epoch=epoch,
+                )
+            with run_without_mixstyle(model):
+                val_loss, val_acc = self._run_epoch(
+                    mode="val",
+                    model=model,
+                    loader=val_loader,
+                    criterion=criterion,
+                    tb_writer=val_writer,
+                    epoch=epoch,
+                    scheduler=scheduler,
+                )
 
             metrics = {
                 "epoch": epoch,
@@ -283,13 +302,14 @@ class DomGenTrainer:
         checkpoint = torch.load(best_model_path, map_location=self.device, weights_only=True)
         model.load_state_dict(checkpoint["model_state_dict"])
 
-        test_metrics = self._run_epoch(
-            mode="test",
-            model=model,
-            loader=test_loader,
-            criterion=criterion,
-            tb_writer=test_writer,
-        )
+        with run_without_mixstyle(model):
+            test_metrics = self._run_epoch(
+                mode="test",
+                model=model,
+                loader=test_loader,
+                criterion=criterion,
+                tb_writer=test_writer,
+            )
         return metrics_summary, {"Test Loss": test_metrics[0], "Test Accuracy": test_metrics[1]}
 
     def _prepare_domain(
@@ -305,7 +325,9 @@ class DomGenTrainer:
         train_loader, val_loader, test_loader = dataset.generate_loaders(
             batch_size=self.args["batch_size"]
         )
-        model = get_model(self.model, dataset.num_classes).to(self.device)
+        model = get_model(
+            self.model, dataset.num_classes, **self.args
+        ).to(self.device)
         criterion = get_criterion(self.criterion)
         optimizer = get_optimizer(
             optimizer_name=self.optimizer,
@@ -357,8 +379,16 @@ class DomGenTrainer:
                 print(f'Saved training metrics for {domain} in {run_folder}/{train_file}')
                 print(f'Saved testing metrics for {domain} in {run_folder}/{test_file}')
 
+    def serialize_augmentations(self):
+        return {key: str(value.__class__) for key, value in self.args['augment'].items()}
+
     def save_config(self, filename):
         config = vars(self)
+
+        if 'args' in config and 'augment' in config['args']:
+            config['args']['augment'] = self.serialize_augmentations()
+        if self.early_stopping:
+            config['early_stopping'] = self.early_stopping.serialize()
 
         with open(filename, 'w') as f:
             json.dump(config, f, indent=4)
