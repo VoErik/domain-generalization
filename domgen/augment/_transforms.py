@@ -31,12 +31,11 @@ def imagenet_transform(
 def create_augmentation_pipeline(augmentations: dict) -> Transforms:
     pipeline = []
     for key, aug in augmentations.items():
-        if key != "noop":
-            pipeline.append(A.OneOrOther(augmentations["noop"], aug))
-
+        pipeline.append(A.OneOrOther(A.NoOp(), aug))
     pipeline.append(A.Normalize(
         mean=[0.485, 0.456, 0.406],
-        std=[0.229, 0.224, 0.225]))
+        std=[0.229, 0.224, 0.225]
+    ))
     pipeline.append(ToTensorV2())
 
     augment = Transforms(A.Compose(pipeline))
