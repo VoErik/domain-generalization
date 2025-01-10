@@ -9,7 +9,7 @@ class EarlyStopping:
     Early stops the training if the monitored metric doesn't improve after a given number of epochs.
     """
 
-    def __init__(self, patience=5, delta=0.01, mode='min'):
+    def __init__(self, patience=10, delta=0.01, mode='min'):
         """
         :param patience: Epochs to wait before early stopping.
         :param delta: Minimum improvement to qualify as significant.
@@ -49,6 +49,17 @@ class EarlyStopping:
         self.counter = 0
         self.best_score = None
         self.stop = False
+
+    def serialize(self):
+        """ serialize only the relevant parameters of the early stopping instance. """
+        return {
+            'patience': self.patience,
+            'min_delta': self.min_delta,
+            'mode': self.mode,
+            'counter': self.counter,
+            'best_score': self.best_score,
+            'stop': self.stop
+        }
 
 
 def delete_model_dirs(root_dir):
