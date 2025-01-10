@@ -7,28 +7,24 @@ from domgen.utils import config_to_namespace, merge_namespace
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset_dir', type=str, default='datasets', help='path to datasets')
-    parser.add_argument('--dataset', type=str, default='PACS', help='dataset name')
-    parser.add_argument('--batch_size', type=int, default=64, help='batch size')
-    parser.add_argument('--criterion', type=str, default='cross_entropy', help='loss criterion')
-    parser.add_argument('--optimizer', type=str, default='sgd', help='optimizer name')
-    parser.add_argument('--patience', type=int, default=5, help='patience for lr scheduling and early stopping')
-    parser.add_argument('--use_scheduling', action='store_true', default=True, help='use scheduling')
-    parser.add_argument('--use_early_stopping', action='store_true', default=True, help='use early stopping')
-    parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
-    parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
-    parser.add_argument('--epochs', type=int, default=5, help='number of epochs per split')
+    parser.add_argument('--dataset_dir', type=str, help='path to datasets')
+    parser.add_argument('--dataset', type=str, help='dataset name')
+    parser.add_argument('--batch_size', type=int, help='batch size')
+    parser.add_argument('--criterion', type=str, help='loss criterion')
+    parser.add_argument('--optimizer', type=str, help='optimizer name')
+    parser.add_argument('--patience', type=int, help='patience for lr scheduling and early stopping')
+    parser.add_argument('--lr', type=float, help='learning rate')
+    parser.add_argument('--momentum', type=float, help='momentum')
+    parser.add_argument('--epochs', type=int, help='number of epochs per split')
     parser.add_argument('--device', type=str, help='Device to train on')
     parser.add_argument('--seed', type=int, default=42, help='random seed')
     parser.add_argument('--deterministic', action='store_true', default=False, help='use seed or not')
-    parser.add_argument('--experiment', type=str, default='exp', help='dir of the experiment')
-    parser.add_argument('--log_dir', type=str, default='experiments', help='log directory')
-    parser.add_argument('--model', type=str, default='ResNet18', help='base model')
-    parser.add_argument('--pretrained', action='store_true', default=False, help='use pretrained model')
-    parser.add_argument('--num_runs', type=int, default=10, help='Number of runs per experiment')
-    parser.add_argument('--silent', action='store_true', default=False, help='silent mode')
+    parser.add_argument('--experiment', type=str, help='dir of the experiment')
+    parser.add_argument('--log_dir', type=str, help='log directory')
+    parser.add_argument('--model', type=str, help='base model')
+    parser.add_argument('--num_runs', type=int, help='Number of runs per experiment')
+    parser.add_argument('--silent', action='store_true', help='silent mode')
     parser.add_argument('--config', type=str, default=None, help='config file')
-    parser.add_argument('--delete_checkpoints', action='store_true', default=True, help='delete checkpoints')
 
     # --- get training arguments from either cmd line or config file (yaml / json) --- #
     cmd_args = parser.parse_args()
@@ -39,7 +35,7 @@ if __name__ == '__main__':
     experiment_path = f'{args.log_dir}/{args.experiment}'
 
     # --- load augment based on configuration --> currently dummy --- #
-    augment = {'flip': A.HorizontalFlip(p=1), 'noop': A.NoOp()}
+    augment = {"hflip": A.HorizontalFlip(p=1), "noop": A.NoOp(p=1)}
 
     # --- train --- #
     trainer = DomGenTrainer(
@@ -47,16 +43,23 @@ if __name__ == '__main__':
         optimizer=args.optimizer,
         criterion=args.criterion,
         dataset=args.dataset,
-        epochs_per_experiment=1,
+        epochs_per_experiment=args.epochs,
         log_dir=args.log_dir,
-        checkpoint_dir=f'{experiment_path}/checkpoints',
-        lr=args.lr,
+        experiment=args.experiment,
+        checkpoint_dir=f'{args.experiment}/checkpoints',
+        lr=float(args.lr),
         pretrained=args.pretrained,
         momentum=args.momentum,
         dataset_dir=args.dataset_dir,
         batch_size=args.batch_size,
-        num_experiments=1,
-        augment=augment
+        num_experiments=args.num_runs,
+        mixstyle_layers=args.mixstyle_layers,
+        mixstyle_alpha=args.mixstyle_alpha,
+        mixstyle_p=args.mixstyle_p,
+        mix_type=args.mix_type,
+        augment=augment,
+        visualize_latent=args.visualize_latent,
+        patience=args.patience,
     )
     trainer.fit()
 
