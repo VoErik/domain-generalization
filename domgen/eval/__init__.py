@@ -1,8 +1,8 @@
-from domgen.eval._plotting import (plot_accuracies, plot_training_curves,
-                                   plot_hyperparameters, load_results, find_common_configs)
+from domgen.eval._plotting import (plot_accuracies, plot_training_curves,)
+from domgen.eval._latent_space_eval import get_features_with_reduction, visualize_features_by_block, reduce_features_by_block
 
 __all__ = ['plot_accuracies',
            'plot_training_curves',
-           'plot_hyperparameters',
-           'load_results',
-           'find_common_configs']
+           'get_features_with_reduction',
+           'visualize_features_by_block',
+           'reduce_features_by_block',]
