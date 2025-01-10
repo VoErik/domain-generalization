@@ -1,6 +1,6 @@
 import torch.nn as nn
 from torch import Tensor
-from typing import Type
+from typing import List, Type
 
 from torch.utils import model_zoo
 
@@ -30,6 +30,8 @@ class ResNet(nn.Module):
             block: Type[nn.Module],
             layers: list,
             num_classes: int,
+            fc_dims=None,
+            dropout_p=None,
             mixstyle_layers: list = [],
             mixstyle_p: float = 0.5,
             mixstyle_alpha: float = 0.3,
@@ -37,7 +39,7 @@ class ResNet(nn.Module):
     ):
         super(ResNet, self).__init__()
         self.in_channels = 64
-
+        self.feature_dim = 512 * block.expansion
         self.conv1 = nn.Conv2d(3, self.in_channels, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = nn.BatchNorm2d(self.in_channels)
         self.relu = nn.ReLU(inplace=True)
@@ -49,7 +51,10 @@ class ResNet(nn.Module):
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
+        self.fc = self._construct_fc_layer(
+            fc_dims, 512 * block.expansion, dropout_p
+        )
+        self.classifier = nn.Linear(self.feature_dim, num_classes)
 
         self.mixstyle = None
         if mixstyle_layers:
@@ -57,7 +62,13 @@ class ResNet(nn.Module):
             print('Insert MixStyle after the following layers: {}'.format(mixstyle_layers))
         self.mixstyle_layers = mixstyle_layers
 
-    def _make_layer(self, block: Type[nn.Module], out_channels: int, num_blocks: int, stride: int):
+    def _make_layer(
+            self,
+            block: Type[nn.Module],
+            out_channels: int,
+            num_blocks: int,
+            stride: int
+    ) -> nn.Sequential:
         strides = [stride] + [1] * (num_blocks - 1)
         layers = []
 
@@ -74,7 +85,47 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def feature_extractor(self, x):
+    def _construct_fc_layer(
+            self,
+            fc_dims: List[int],
+            input_dim: int,
+            dropout_p: float = None
+    ) -> nn.Sequential|None:
+        """
+        Constructs fully connected layer
+
+        :param fc_dims: dimensions of fc layers, if None, no fc layers are constructed
+        :param input_dim: input dimension
+        :param dropout_p: dropout probability, if None, dropout is unused
+        """
+        if fc_dims is None:
+            self.feature_dim = input_dim
+            return None
+
+        assert isinstance(
+            fc_dims, (list, tuple)
+        ), 'fc_dims must be either list or tuple, but got {}'.format(
+            type(fc_dims)
+        )
+
+        layers = []
+        for dim in fc_dims:
+            layers.append(nn.Linear(input_dim, dim))
+            layers.append(nn.BatchNorm1d(dim))
+            layers.append(nn.ReLU(inplace=True))
+            if dropout_p is not None:
+                layers.append(nn.Dropout(p=dropout_p))
+            input_dim = dim
+
+        self.feature_dim = fc_dims[-1]
+
+        return nn.Sequential(*layers)
+
+    def _feature_extractor(
+            self,
+            x: Tensor,
+    ) -> Tensor:
+        """Pass through the ResNet-blocks."""
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -98,14 +149,18 @@ class ResNet(nn.Module):
 
         return x
 
-    def forward(self, x: Tensor) -> Tensor:
-        out = self.feature_extractor(x)
+    def forward(
+            self,
+            x: Tensor
+    ) -> Tensor:
+        out = self._feature_extractor(x)
 
         out = self.avgpool(out)
-        out = out.view(out.size(0), -1)
-        out = self.fc(out)
-
-        return out
+        v = out.view(out.size(0), -1)
+        if self.fc is not None:
+            v = self.fc(v)
+        y = self.classifier(v)
+        return y
 
 
 class BasicBlock (nn.Module):
@@ -251,6 +306,7 @@ def init_pretrained_weights(model, model_url):
 
     Layers that don't match with pretrained layers in name or size are kept unchanged.
     """
+    print("Initializing pretrained weights...")
     pretrain_dict = model_zoo.load_url(model_url)
     model_dict = model.state_dict()
     pretrain_dict = {
@@ -262,36 +318,47 @@ def init_pretrained_weights(model, model_url):
     model.load_state_dict(model_dict)
 
 
-def resnet18(num_classes: int, pretrained: bool = True, **kwargs):
-    model = ResNet(BasicBlock, [2, 2, 2, 2], num_classes, mixstyle_layers=['layer1', 'layer2', 'layer3'], **kwargs)
-    if pretrained:
+def resnet18(num_classes: int, **kwargs):
+    model = ResNet(
+        BasicBlock, [2, 2, 2, 2], num_classes, **kwargs
+    )
+    if kwargs.get('pretrained', False):
+        print("happening")
         init_pretrained_weights(model, model_urls['resnet18'])
     return model
 
 
 def resnet34(num_classes: int, pretrained: bool = True, **kwargs):
-    model = ResNet(BasicBlock, [3, 4, 6, 3], num_classes, **kwargs)
+    model = ResNet(
+        BasicBlock, [3, 4, 6, 3], num_classes, **kwargs
+    )
     if pretrained:
         init_pretrained_weights(model, model_urls['resnet34'])
     return model
 
 
 def resnet50(num_classes: int, pretrained: bool = True, **kwargs):
-    model = ResNet(Bottleneck, [3, 4, 6, 3], num_classes, **kwargs)
+    model = ResNet(
+        Bottleneck, [3, 4, 6, 3], num_classes, **kwargs
+    )
     if pretrained:
         init_pretrained_weights(model, model_urls['resnet50'])
     return model
 
 
 def resnet101(num_classes: int, pretrained: bool = True, **kwargs):
-    model = ResNet(Bottleneck, [3, 4, 23, 3], num_classes, **kwargs)
+    model = ResNet(
+        Bottleneck, [3, 4, 23, 3], num_classes, **kwargs
+    )
     if pretrained:
         init_pretrained_weights(model, model_urls['resnet101'])
     return model
 
 
 def resnet152(num_classes: int, pretrained: bool = True, **kwargs):
-    model = ResNet(Bottleneck, [3, 8, 36, 3], num_classes, **kwargs)
+    model = ResNet(
+        Bottleneck, [3, 8, 36, 3], num_classes, **kwargs
+    )
     if pretrained:
         init_pretrained_weights(model, model_urls['resnet152'])
     return model
