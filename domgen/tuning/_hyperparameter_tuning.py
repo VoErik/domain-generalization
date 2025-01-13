@@ -89,13 +89,14 @@ class ParamTuner(BaseTuner):
 
         search_space = self.construct_search_space()
         trainable = self.get_trainable()
+        trainable_with_cpu = tune.with_resources(trainable=trainable, resources={'cpu': 2})
 
-        trainable_with_gpu = tune.with_resources(trainable, {"gpu": self.num_gpu})
+        #trainable_with_gpu = tune.with_resources(trainable, {"gpu": self.num_gpu})
         tuner = tune.Tuner(
-            trainable_with_gpu,
+            trainable_with_cpu,
             tune_config=tune.TuneConfig(
                 num_samples=self.num_trials,
-                scheduler=ASHAScheduler(metric="mean_accuracy", mode=self.mode),
+                scheduler=ASHAScheduler(metric="mean_accuracy", mode='max'),
                 max_concurrent_trials=self.max_concurrent
             ),
             run_config=RunConfig(
