@@ -187,4 +187,4 @@ class Camelyon17(DomainDataset):
 
     def __init__(self, root, test_domain, **kwargs):
         self.dir = os.path.join(root, "camelyon17/")
-        super().__init__(self.dir, test_domain, augment=camelyon17_aug, subset=0.2)
+        super().__init__(self.dir, test_domain, augment=camelyon17_aug, subset=0.05)
