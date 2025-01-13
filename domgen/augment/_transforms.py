@@ -126,6 +126,12 @@ shared_aug = {
     "transpose": A.Transpose(p=0.5)
 }
 
+"""
+Carlucci, F. M., D'Innocente, A., Bucci, S., Caputo, B., & Tommasi, T. (2019). 
+Domain generalization by solving jigsaw puzzles. 
+In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition (pp. 2229-2238).
+"""
+
 carlucci_1 = A.Compose([
     A.RandomResizedCrop(height=256, width=256, scale=(0.8, 1.0)),
     A.HorizontalFlip(p=0.5)
@@ -144,6 +150,12 @@ carlucci_3 = A.Compose([
     # ToTensorV2()
 ])
 
+"""
+Wang, S., Yu, L., Li, C., Fu, C. W., & Heng, P. A. (2020). 
+Learning from extrinsic and intrinsic supervisions for domain generalization. 
+In European Conference on Computer Vision (pp. 159-176). Cham: Springer International Publishing.
+"""
+
 wang_1 = A.Compose([
     A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=0.5)
     # ToTensorV2()
@@ -155,6 +167,12 @@ wang_2 = A.Compose([
     A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=0.5)
     # ToTensorV2()
 ])
+
+"""
+Zhou, K., Yang, Y., Hospedales, T., & Xiang, T. (2020). 
+Deep domain-adversarial image generation for domain generalisation. 
+In Proceedings of the AAAI conference on artificial intelligence (Vol. 34, No. 07, pp. 13025-13032).
+"""
 
 zhou = A.Compose([
     A.Resize(height=int(256 * 1.25), width=int(256 * 1.25)),
