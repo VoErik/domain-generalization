@@ -2,6 +2,7 @@ import os
 import tempfile
 from argparse import Namespace
 from datetime import datetime
+from typing import Tuple, Optional
 
 import torch
 from ray import train, tune
@@ -9,6 +10,8 @@ from ray.air import RunConfig, Result
 from ray.train import Checkpoint
 from ray.tune.schedulers import ASHAScheduler
 from ruamel.yaml import YAML
+from tqdm import tqdm
+
 from domgen.models import get_model, get_criterion, get_optimizer, get_device
 from domgen.tuning._base_tuner import BaseTuner
 
@@ -29,11 +32,12 @@ class ParamTuner(BaseTuner):
         args.use_scheduling = False
         args.silent = self.silent
         for i in range(self.base_config["num_epochs"]):
-            train_epoch(
+            _, _ = run_epoch(
                 model=model, optimizer=optimizer, criterion=criterion,
-                train_loader=train_loader, device=device, args=args
+                loader=train_loader, device=device, mode='train'
             )
-            val_loss, acc = validate(args, model, val_loader, criterion, device)
+            val_loss, acc = run_epoch(
+                model=model, loader=val_loader, criterion=criterion, device=device, mode='val')
 
             with tempfile.TemporaryDirectory() as temp_checkpoint_dir:
                 checkpoint = None
@@ -128,3 +132,54 @@ class ParamTuner(BaseTuner):
                 raise ValueError(f"Unsupported format for search space entry: {key} -> {value}")
 
         return ray_search_space
+
+
+def run_epoch(
+        mode: str,
+        model: torch.nn.Module,
+        loader: torch.utils.data.DataLoader,
+        criterion: torch.nn.Module,
+        optimizer: Optional[torch.optim.Optimizer] = None,
+        device: str = 'cpu'
+) -> Tuple[float, float]:
+    """
+        Generic method for training, validation, and testing.
+        :param device: Device to train on.
+        :param mode: 'train', 'val', or 'test'
+        :param model: Model instance.
+        :param loader: DataLoader instance for the respective set.
+        :param criterion: Loss function.
+        :param optimizer: Optimizer (only used for training).
+        :return: Tuple of average loss and accuracy.
+        """
+    is_train = mode == 'train'
+    model.train() if is_train else model.eval()
+    total_loss = 0.0
+    correct_predictions = 0
+    total_predictions = 0
+
+    with tqdm(loader, desc=mode.capitalize(), unit="batch", disable=True) as batch:
+        for inputs, labels in batch:
+
+            inputs, labels = inputs['image'].to(device), labels.to(device)
+
+            if is_train:
+                optimizer.zero_grad()
+
+            with torch.set_grad_enabled(is_train):
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
+
+                if is_train:
+                    loss.backward()
+                    optimizer.step()
+
+            total_loss += loss.item() * inputs.size(0)
+            predictions = outputs.argmax(dim=1)
+            correct_predictions += (predictions == labels).sum().item()
+            total_predictions += labels.size(0)
+
+    avg_loss = total_loss / total_predictions
+    avg_accuracy = 100.0 * correct_predictions / total_predictions
+
+    return avg_loss, avg_accuracy
