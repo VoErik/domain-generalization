@@ -19,12 +19,12 @@ nesterov: None # not used
 
 # Early stopping and scheduling
 use_early_stopping: true
-patience: 10
+patience: 6
 use_scheduling: true
 
 # Device and pretraining
 device: "cuda"
-pretrained: false
+pretrained: true
 
 # Experiment details
 log_dir: "experiments"

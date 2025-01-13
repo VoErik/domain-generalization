@@ -24,7 +24,7 @@ use_scheduling: true
 
 # Device and pretraining
 device: "cuda"
-pretrained: false
+pretrained: true
 
 # Experiment details
 log_dir: "experiments"
