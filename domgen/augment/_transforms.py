@@ -125,3 +125,40 @@ shared_aug = {
                        crop_border=False, mask_interpolation=0, fill=0, fill_mask=0, p=0.5),
     "transpose": A.Transpose(p=0.5)
 }
+
+carlucci_1 = A.Compose([
+    A.RandomResizedCrop(height=256, width=256, scale=(0.8, 1.0)),
+    A.HorizontalFlip(p=0.5)
+    # ToTensorV2()
+])
+
+carlucci_2 = A.Compose([
+    A.ToGray(p=0.1)
+    # ToTensorV2()
+])
+
+carlucci_3 = A.Compose([
+    A.RandomResizedCrop(height=256, width=256, scale=(0.8, 1.0)),
+    A.HorizontalFlip(p=0.5),
+    A.ToGray(p=0.1)
+    # ToTensorV2()
+])
+
+wang_1 = A.Compose([
+    A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=0.5)
+    # ToTensorV2()
+])
+
+wang_2 = A.Compose([
+    A.RandomResizedCrop(height=256, width=256, scale=(0.8, 1.0)),
+    A.HorizontalFlip(p=0.5),
+    A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=0.5)
+    # ToTensorV2()
+])
+
+zhou = A.Compose([
+    A.Resize(height=int(256 * 1.25), width=int(256 * 1.25)),
+    A.RandomCrop(height=256, width=256),
+    A.HorizontalFlip(p=0.5)
+    # ToTensorV2()
+])
