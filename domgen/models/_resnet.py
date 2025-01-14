@@ -4,7 +4,7 @@ from typing import List, Type
 
 from torch.utils import model_zoo
 
-from ._mixstyle import MixStyle
+from domgen.augment._mixstyle import MixStyle
 
 
 model_urls = {

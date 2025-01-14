@@ -1,11 +1,9 @@
-from typing import List
-
 import torch
 import torch.nn as nn
 from torch import Tensor
 from torch.utils import model_zoo
 
-from domgen.models._mixstyle import MixStyle
+from domgen.augment._mixstyle import MixStyle
 
 model_urls = {
     "densenet121": "https://download.pytorch.org/models/densenet121-a639ec97.pth",
