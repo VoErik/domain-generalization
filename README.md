@@ -143,3 +143,5 @@ and follows the structure as shown (subdirectories for each domain containing th
 ### Resources
 
 Zamanitajeddin et al. (2024): [Benchmarking Domain Generalization Algorithms in Computational Pathology](https://arxiv.org/html/2409.17063v1)
+
+Aminbeidokhti et al. (2023): [Domain Generalization by Rejecting Extreme Augmentations](https://arxiv.org/pdf/2310.06670)
