@@ -4,6 +4,7 @@ from argparse import Namespace
 from datetime import datetime
 from typing import Tuple, Optional
 
+import albumentations
 import torch
 from ray import train, tune
 from ray.air import RunConfig, Result
@@ -28,6 +29,7 @@ class AugmentationTuner(BaseTuner):
         with open(base_config, "r") as f:
             self.base_config = yaml.load(f)
         self.tune_config = tune_config
+        self.option = 'choose-compose'
 
     def get_trainable(self):
         """
@@ -51,14 +53,26 @@ class AugmentationTuner(BaseTuner):
             # Todo: Here, the logic for creating the augmentation that is passed to the get_dataset function is located
             # It should work for the following scenarios:
             # 1. Pass in an entire torchvision.Compose object.
-            if conf['option'] == 'choose-compose':
+            if self.option == 'choose-compose':
+                # search space: liste von Compose Objects -> nicht trivial
+                # -> pro trial 1 Compose Object raus
+                # augmentation = conf["candidate-compose"]
                 pass
             # 2. Pass in list of possible augmentation steps, then create a Compose object from them
             if conf['option'] == "build-compose":
+                # search space: dict von Augmentations (zB shared_augs)
+                    # tune.choice fürs 1 Aug
+                    # tune.choice fürs 2 Aug
+                    # tune.choice fürs 3 Aug
+                # augmentation = create_aug_pipeline()
                 pass
             # 3. Pass in a Compose object but tune the parameters of the augmentation steps.
             if conf['option'] == "tune-compose":
-                pass
+                augmentation = albumentations.Compose(
+                    [
+                        albumentations.blur(conf["blur_limit"]),
+                    ]
+                )
             augmentation = None
 
             from domgen.data import get_dataset
