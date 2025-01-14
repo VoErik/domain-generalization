@@ -63,9 +63,6 @@ def get_criterion(
                          f"Available options: {list(criteria.keys())}")
 
 
-import torchvision.models as models
-
-
 def get_model(
         model_name: str,
         num_classes: int,
