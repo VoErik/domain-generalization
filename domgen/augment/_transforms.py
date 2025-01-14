@@ -180,3 +180,124 @@ zhou = A.Compose([
     A.HorizontalFlip(p=0.5)
     # ToTensorV2()
 ])
+
+"""
+Specifically for Camelyon17:
+
+Di Salvo, F., Doerrich, S., & Ledig, C. (2024). 
+MedMNIST-C: Comprehensive benchmark and improved classifier robustness by simulating realistic image corruptions. 
+arXiv preprint arXiv:2406.17536.
+"""
+
+diSalvo_blur = A.Compose([
+    A.Defocus(radius=(3, 8), alias_blur=(0.2, 0.5), p=0.8),
+    A.MotionBlur(blur_limit=(3, 10), p=0.8)
+])
+
+# increase brightness, increase contrast, increase saturate
+diSalvo_color_1 = A.Compose([
+    A.RandomBrightnessContrast(brightness_limit=(0.2, 0.5), contrast_limit=(0.2, 0.5), p=1.0),
+    A.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=(20, 40), val_shift_limit=0, p=1.0),
+])
+
+# increase brightness, decrease contrast, decrease saturate
+diSalvo_color_2 = A.Compose([
+    A.RandomBrightnessContrast(brightness_limit=(0.2, 0.5), contrast_limit=(-0.5, -0.2), p=1.0),
+    A.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=(-40, -20), val_shift_limit=0, p=1.0),
+])
+
+# decrease brightness, increase contrast, increase saturate
+diSalvo_color_3 = A.Compose([
+    A.RandomBrightnessContrast(brightness_limit=(-0.5, -0.2), contrast_limit=(0.2, 0.5), p=1.0),
+    A.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=(20, 40), val_shift_limit=0, p=1.0),
+])
+
+# decrease brightness, decrease contrast, decrease saturate
+diSalvo_color_4 = A.Compose([
+    A.RandomBrightnessContrast(brightness_limit=(-0.5, -0.2), contrast_limit=(-0.5, -0.2), p=1.0),
+    A.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=(-40, -20), val_shift_limit=0, p=1.0),
+])
+
+# increase brightness, increase contrast, decrease saturate
+diSalvo_color_5 = A.Compose([
+    A.RandomBrightnessContrast(brightness_limit=(0.2, 0.5), contrast_limit=(0.2, 0.5), p=1.0),
+    A.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=(-40, -20), val_shift_limit=0, p=1.0),
+])
+
+# increase brightness, decrease contrast, increase saturate
+diSalvo_color_6 = A.Compose([
+    A.RandomBrightnessContrast(brightness_limit=(0.2, 0.5), contrast_limit=(-0.5, -0.2), p=1.0),
+    A.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=(20, 40), val_shift_limit=0, p=1.0),
+])
+
+# decrease brightness, increase contrast, decrease saturate
+diSalvo_color_7 = A.Compose([
+    A.RandomBrightnessContrast(brightness_limit=(-0.5, -0.2), contrast_limit=(0.2, 0.5), p=1.0),
+    A.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=(-40, -20), val_shift_limit=0, p=1.0),
+])
+
+# decrease brightness, decrease contrast, increase saturate
+diSalvo_color_8 = A.Compose([
+    A.RandomBrightnessContrast(brightness_limit=(-0.5, -0.2), contrast_limit=(-0.5, -0.2), p=1.0),
+    A.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=(20, 40), val_shift_limit=0, p=1.0),
+])
+
+"""
+Custom augmentations
+"""
+
+color_geometric = A.Compose([
+    A.ColorJitter(0.2, 0.2, 0.2, 0.1, p=1),
+    A.Rotate((-45, 45), interpolation=1, border_mode=4, p=0.5),
+    A.HorizontalFlip(p=0.5)
+])
+
+color_distortion = A.Compose([
+    A.HueSaturationValue((-20, 20), (-30, 30), (-20, 20), p=1),
+    A.GridDistortion(5, (-0.3, 0.3), p=0.5),
+    A.Transpose(p=0.5)
+])
+
+contrast_geometric = A.Compose([
+    A.CLAHE((1, 4), (8, 8), always_apply=False, p=1),
+    A.RandomResizedCrop((512, 320), scale=(0.08, 1), ratio=(0.75, 1.33), p=1),
+    A.Rotate((-90, 90), interpolation=1, border_mode=4, p=0.5)
+])
+
+noise_geometric = A.Compose([
+    A.GaussNoise(std_range=(0.1, 0.2), p=1),
+    A.Rotate((-45, 45), interpolation=1, border_mode=4, p=0.5),
+    A.HorizontalFlip(p=0.5)
+])
+
+noise_color_geometric = A.Compose([
+    A.Defocus(radius=(4, 8), alias_blur=(0.2, 0.4), p=1),
+    A.ColorJitter(0.2, 0.2, 0.2, 0.1, p=1),
+    A.HorizontalFlip(p=0.5)
+])
+
+masking_color = A.Compose([
+    A.Solarize(threshold=0.5, p=1),
+    A.GridDropout(ratio=0.3, unit_size_min=10, unit_size_max=20, random_offset=True, p=1.0),
+    A.HueSaturationValue((-20, 20), (-30, 30), (-20, 20), p=1)
+])
+
+masking_noise = A.Compose([
+    A.XYMasking((1, 3), (1, 3), (10, 20), (10, 20), fill=0, fill_mask=0, p=1),
+    A.GaussNoise(std_range=(0.1, 0.3), p=1),
+    A.Rotate((-30, 30), p=0.5)
+])
+
+distortion_noise = A.Compose([
+    A.GridDistortion(num_steps=5, distort_limit=(-0.4, 0.4), p=1),
+    A.Defocus(radius=(3, 6), alias_blur=(0.1, 0.3), p=1),
+    A.Transpose(p=0.5)
+])
+
+# particular for sketches
+# should emphasize edges, mask & rotate for variability
+sketches = A.Compose([
+    A.Solarize(threshold=0.5, p=1),
+    A.XYMasking((1, 2), (1, 3), (15, 25), (15, 25), fill=0, fill_mask=0, p=1),
+    A.Rotate((-90, 90), p=0.5)
+])
