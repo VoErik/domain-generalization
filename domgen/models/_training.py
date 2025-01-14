@@ -2,7 +2,7 @@ import json
 import os
 import pprint
 from datetime import datetime
-from typing import Tuple, List, Dict, Optional
+from typing import Tuple, List, Optional
 
 import pandas as pd
 import torch
@@ -14,7 +14,8 @@ from ._utils import EarlyStopping
 from ._model_config import get_device, get_model, get_criterion, get_optimizer
 from ..data import DOMAIN_NAMES, get_dataset
 from domgen.eval import get_features_with_reduction, visualize_features_by_block, reduce_features_by_block
-from ._mixstyle import run_with_mixstyle, run_without_mixstyle
+from domgen.augment._mixstyle import run_with_mixstyle, run_without_mixstyle
+from domgen.augment._mixup import mixup_data, mixup_criterion
 
 logging.basicConfig(
     level=logging.INFO,
@@ -86,6 +87,8 @@ class DomGenTrainer:
             experiment: str = 'exp',
             checkpoint_dir: str = 'checkpoints',
             silent: bool = False,
+            use_mixup: bool = False,
+            mixup_alpha: float = 1.,
             **kwargs
     ) -> None:
         self.model = model
@@ -103,6 +106,8 @@ class DomGenTrainer:
         self.log_dir = log_dir
         self.experiment = experiment
         self.silent = silent
+        self.use_mixup = use_mixup
+        self.mixup_alpha = mixup_alpha
 
         os.makedirs(f'{self.log_dir}/{checkpoint_dir}', exist_ok=True)
         self.checkpoint_dir = f'{self.log_dir}/{checkpoint_dir}'
@@ -199,12 +204,22 @@ class DomGenTrainer:
                 else:
                     inputs, labels = inputs['image'].to(self.device), labels.to(self.device)
 
+                if self.use_mixup:
+                    inputs, targets_a, targets_b, lam = mixup_data(
+                        x=inputs, y=labels, alpha=self.mixup_alpha, device=self.device
+                    )
+
                 if is_train:
                     optimizer.zero_grad()
 
                 with torch.set_grad_enabled(is_train):
                     outputs = model(inputs)
-                    loss = criterion(outputs, labels)
+                    if self.use_mixup:
+                        loss = mixup_criterion(
+                            criterion=criterion, pred=outputs, y_a=targets_a, y_b=targets_b, lam=lam
+                        )
+                    else:
+                        loss = criterion(outputs, labels)
 
                     if is_train:
                         loss.backward()
