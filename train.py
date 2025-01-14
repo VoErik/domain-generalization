@@ -60,6 +60,8 @@ if __name__ == '__main__':
         augment=augment,
         visualize_latent=args.visualize_latent,
         patience=args.patience,
+        use_mixup=args.use_mixup,
+        mixup_alpha=args.mixup_alpha,
     )
     trainer.fit()
 
