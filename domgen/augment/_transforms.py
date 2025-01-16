@@ -5,6 +5,9 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from albumentations import Compose
 import numpy as np
+import medmnistc
+from medmnistc.augmentation import AugMedMNISTC
+from medmnistc.corruptions.registry import CORRUPTIONS_DS
 
 
 class Transforms:
@@ -189,58 +192,17 @@ MedMNIST-C: Comprehensive benchmark and improved classifier robustness by simula
 arXiv preprint arXiv:2406.17536.
 """
 
-diSalvo_blur = A.Compose([
-    A.Defocus(radius=(3, 8), alias_blur=(0.2, 0.5), p=0.8),
-    A.MotionBlur(blur_limit=(3, 10), p=0.8)
+dataset = "pathmnist"
+train_corruptions = CORRUPTIONS_DS[dataset]
+
+augment = AugMedMNISTC(train_corruptions)
+
+diSalvo = transforms.Compose([
+    AugMedMNISTC(train_corruptions)
+    # transforms.ToTensor(),
+    # transforms.Normalize(mean=..., std=...)
 ])
 
-# increase brightness, increase contrast, increase saturate
-diSalvo_color_1 = A.Compose([
-    A.RandomBrightnessContrast(brightness_limit=(0.2, 0.5), contrast_limit=(0.2, 0.5), p=1.0),
-    A.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=(20, 40), val_shift_limit=0, p=1.0),
-])
-
-# increase brightness, decrease contrast, decrease saturate
-diSalvo_color_2 = A.Compose([
-    A.RandomBrightnessContrast(brightness_limit=(0.2, 0.5), contrast_limit=(-0.5, -0.2), p=1.0),
-    A.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=(-40, -20), val_shift_limit=0, p=1.0),
-])
-
-# decrease brightness, increase contrast, increase saturate
-diSalvo_color_3 = A.Compose([
-    A.RandomBrightnessContrast(brightness_limit=(-0.5, -0.2), contrast_limit=(0.2, 0.5), p=1.0),
-    A.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=(20, 40), val_shift_limit=0, p=1.0),
-])
-
-# decrease brightness, decrease contrast, decrease saturate
-diSalvo_color_4 = A.Compose([
-    A.RandomBrightnessContrast(brightness_limit=(-0.5, -0.2), contrast_limit=(-0.5, -0.2), p=1.0),
-    A.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=(-40, -20), val_shift_limit=0, p=1.0),
-])
-
-# increase brightness, increase contrast, decrease saturate
-diSalvo_color_5 = A.Compose([
-    A.RandomBrightnessContrast(brightness_limit=(0.2, 0.5), contrast_limit=(0.2, 0.5), p=1.0),
-    A.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=(-40, -20), val_shift_limit=0, p=1.0),
-])
-
-# increase brightness, decrease contrast, increase saturate
-diSalvo_color_6 = A.Compose([
-    A.RandomBrightnessContrast(brightness_limit=(0.2, 0.5), contrast_limit=(-0.5, -0.2), p=1.0),
-    A.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=(20, 40), val_shift_limit=0, p=1.0),
-])
-
-# decrease brightness, increase contrast, decrease saturate
-diSalvo_color_7 = A.Compose([
-    A.RandomBrightnessContrast(brightness_limit=(-0.5, -0.2), contrast_limit=(0.2, 0.5), p=1.0),
-    A.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=(-40, -20), val_shift_limit=0, p=1.0),
-])
-
-# decrease brightness, decrease contrast, increase saturate
-diSalvo_color_8 = A.Compose([
-    A.RandomBrightnessContrast(brightness_limit=(-0.5, -0.2), contrast_limit=(-0.5, -0.2), p=1.0),
-    A.HueSaturationValue(hue_shift_limit=0, sat_shift_limit=(20, 40), val_shift_limit=0, p=1.0),
-])
 
 """
 Custom augmentations
@@ -294,9 +256,9 @@ distortion_noise = A.Compose([
     A.Transpose(p=0.5)
 ])
 
-# particular for sketches
 # should emphasize edges, mask & rotate for variability
-sketches = A.Compose([
+# for more extractable features
+color_mask_geometric = A.Compose([
     A.Solarize(threshold=0.5, p=1),
     A.XYMasking((1, 2), (1, 3), (15, 25), (15, 25), fill=0, fill_mask=0, p=1),
     A.Rotate((-90, 90), p=0.5)
