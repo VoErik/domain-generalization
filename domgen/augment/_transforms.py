@@ -17,15 +17,16 @@ class Transforms:
 
 def imagenet_transform(
         input_size: Tuple[int, int]
-) -> torchvision.transforms.Compose:
-    transform = transforms.Compose([
-        transforms.Resize(input_size),
-        transforms.ToTensor(),
-        transforms.Normalize(
+) -> Transforms:
+    transform = A.Compose([
+        A.Resize(input_size[0], input_size[1]),
+        A.Normalize(
             mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225])
+            std=[0.229, 0.224, 0.225]
+        ),
+        ToTensorV2()
     ])
-    return transform
+    return Transforms(transform)
 
 
 def create_augmentation_pipeline(augmentations: dict) -> Transforms:
