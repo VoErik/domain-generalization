@@ -1,6 +1,7 @@
 import argparse
 import albumentations as A
 from types import SimpleNamespace
+
 from domgen.models import DomGenTrainer
 from domgen.eval import plot_accuracies, plot_training_curves
 from domgen.utils import config_to_namespace, merge_namespace
@@ -25,6 +26,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_runs', type=int, help='Number of runs per experiment')
     parser.add_argument('--silent', action='store_true', help='silent mode')
     parser.add_argument('--config', type=str, default=None, help='config file')
+    parser.add_argument('--visualize_latent', type=bool, default=False, help='visualize latent')
 
     # --- get training arguments from either cmd line or config file (yaml / json) --- #
     cmd_args = parser.parse_args()
@@ -34,35 +36,8 @@ if __name__ == '__main__':
     args = merge_namespace(config_namespace, cmd_args)  # cmd line args take precedence
     experiment_path = f'{args.log_dir}/{args.experiment}'
 
-    # --- load augment based on configuration --> currently dummy --- #
-    augment = {"hflip": A.HorizontalFlip(p=1), "noop": A.NoOp(p=1)}
-
     # --- train --- #
-    trainer = DomGenTrainer(
-        model=args.model,
-        optimizer=args.optimizer,
-        criterion=args.criterion,
-        dataset=args.dataset,
-        epochs_per_experiment=args.epochs,
-        log_dir=args.log_dir,
-        experiment=args.experiment,
-        checkpoint_dir=f'{args.experiment}/checkpoints',
-        lr=float(args.lr),
-        pretrained=args.pretrained,
-        momentum=args.momentum,
-        dataset_dir=args.dataset_dir,
-        batch_size=args.batch_size,
-        num_experiments=args.num_runs,
-        mixstyle_layers=args.mixstyle_layers,
-        mixstyle_alpha=args.mixstyle_alpha,
-        mixstyle_p=args.mixstyle_p,
-        mix_type=args.mix_type,
-        augment=augment,
-        visualize_latent=args.visualize_latent,
-        patience=args.patience,
-        use_mixup=args.use_mixup,
-        mixup_alpha=args.mixup_alpha,
-    )
+    trainer = DomGenTrainer(args)
     trainer.fit()
 
     # --- save, plot, etc --- #
