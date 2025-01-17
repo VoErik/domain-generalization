@@ -10,6 +10,9 @@ from parcoords import plot_parcoords
 from scipy.signal import savgol_filter
 from typing_extensions import deprecated
 
+import random
+from PIL import Image
+
 
 def plot_accuracies(
         root_path: str,
@@ -547,3 +550,44 @@ def find_common_configs(
                 common_configs.append(config1)
 
     return common_configs
+
+
+def plot_domain_images(
+        dataset_dir: str,
+        domain: str,
+        class_name: str,
+        num_images: int = 5
+) -> None:
+    """
+    Plots random images from the specified domain and class.
+
+    :param dataset_dir: Path to the dataset directory.
+    :param domain: Name of the domain (e.g., 'domain1').
+    :param class_name: Name of the class (e.g., 'class1').
+    :param num_images: Number of random images to plot. Default is 5.
+    """
+    class_dir = os.path.join(dataset_dir, domain, class_name)
+
+    if not os.path.exists(class_dir):
+        raise ValueError(f"The directory {class_dir} does not exist.")
+
+    image_files = [f for f in os.listdir(class_dir) if os.path.isfile(os.path.join(class_dir, f))]
+
+    if not image_files:
+        raise ValueError(f"No images found in the directory {class_dir}.")
+
+    num_images = min(num_images, len(image_files))
+    random_images = random.sample(image_files, num_images)
+
+    plt.figure(figsize=(10, 5))
+    for i, image_name in enumerate(random_images):
+        image_path = os.path.join(class_dir, image_name)
+        img = Image.open(image_path)
+
+        plt.subplot(1, num_images, i + 1)
+        plt.imshow(img)
+        plt.axis('off')
+        plt.title(f"{domain}_{class_name}")
+
+    plt.tight_layout()
+    plt.show()
