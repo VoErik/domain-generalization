@@ -1,15 +1,14 @@
 import os
 from collections import defaultdict
 import random
+from typing import Any
 
 import numpy as np
-import torchvision
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, ConcatDataset, Subset
 from torchvision.datasets import ImageFolder
 from domgen.augment import imagenet_transform
-from typing import Any
-from domgen.augment._transforms import combine_augmentations, create_augmentation_pipeline
+from domgen.augment._transforms import combine_augmentations, create_augmentation_pipeline, no_transform
 from domgen.augment._transforms import all_augmentations, pacs_aug, camelyon17_aug, shared_aug
 
 """To add a new dataset, just create a class that inherits from `DomainDataset`."""
@@ -36,7 +35,7 @@ class DomainDataset(MultiDomainDataset):
             self,
             root: str,
             test_domain: int,
-            augment: dict = None,
+            augment: Any = None,
             subset: float = None,
     ) -> None:
         """
@@ -56,15 +55,12 @@ class DomainDataset(MultiDomainDataset):
 
         # base augment = ImageNet
         input_size = self.input_shape[-2], self.input_shape[-1]
-        transform = imagenet_transform(input_size=input_size)
+        transform =imagenet_transform(input_size=input_size)
 
-        pipeline = None
-        if augment:
-            pipeline = create_augmentation_pipeline(augment)
 
         for i, domain in enumerate(self.domains):
-            if pipeline and (i != self.test_domain):
-                domain_transform = pipeline
+            if augment and (i != self.test_domain):
+                domain_transform = augment
             else:
                 domain_transform = transform
 
@@ -142,8 +138,8 @@ class DomainDataset(MultiDomainDataset):
         train_split = ConcatDataset(train_subsets)
         val_split = ConcatDataset(val_subsets)
 
-        train_loader = DataLoader(train_split, batch_size=batch_size, shuffle=True)
-        val_loader = DataLoader(val_split, batch_size=batch_size, shuffle=True)
+        train_loader = DataLoader(train_split, batch_size=batch_size, shuffle=True, drop_last=True)
+        val_loader = DataLoader(val_split, batch_size=batch_size, shuffle=True,drop_last=True)
         test_loader = DataLoader(self.data[self.test_domain], batch_size=batch_size, shuffle=False)
 
         return train_loader, val_loader, test_loader
@@ -177,7 +173,7 @@ class PACS(DomainDataset):
 
     def __init__(self, root, test_domain, **kwargs):
         self.dir = os.path.join(root, "PACS/")
-        self.aug = kwargs.get('augment', pacs_aug)
+        self.aug = kwargs.get('augment', None)
         super().__init__(self.dir, test_domain, augment=self.aug)
 
 
@@ -187,4 +183,5 @@ class Camelyon17(DomainDataset):
 
     def __init__(self, root, test_domain, **kwargs):
         self.dir = os.path.join(root, "camelyon17/")
-        super().__init__(self.dir, test_domain, augment=camelyon17_aug, subset=0.05)
+        self.aug = kwargs.get('augment', None)
+        super().__init__(self.dir, test_domain, augment=self.aug, subset=0.05)
