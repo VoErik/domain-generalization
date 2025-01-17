@@ -32,6 +32,7 @@ class ResNet(nn.Module):
             num_classes: int,
             fc_dims=None,
             dropout_p=None,
+            use_mixstyle=False,
             mixstyle_layers: list = [],
             mixstyle_p: float = 0.5,
             mixstyle_alpha: float = 0.3,
@@ -57,7 +58,7 @@ class ResNet(nn.Module):
         self.classifier = nn.Linear(self.feature_dim, num_classes)
 
         self.mixstyle = None
-        if mixstyle_layers:
+        if use_mixstyle:
             self.mixstyle = MixStyle(p=mixstyle_p, alpha=mixstyle_alpha, mix='random')
             print('Insert MixStyle after the following layers: {}'.format(mixstyle_layers))
         self.mixstyle_layers = mixstyle_layers
@@ -323,7 +324,6 @@ def resnet18(num_classes: int, **kwargs):
         BasicBlock, [2, 2, 2, 2], num_classes, **kwargs
     )
     if kwargs.get('pretrained', False):
-        print("happening")
         init_pretrained_weights(model, model_urls['resnet18'])
     return model
 
