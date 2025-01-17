@@ -94,7 +94,6 @@ def get_model(
         raise ValueError(f"Model '{model_name}' not recognized. "
                          f"Available options: {list(models_dict.keys())}")
 
-    print(kwargs)
     model = models_dict[model_name](
         num_classes=num_classes,
         **kwargs
