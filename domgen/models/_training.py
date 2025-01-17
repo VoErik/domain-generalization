@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import pprint
@@ -12,10 +13,10 @@ from tqdm import tqdm
 import logging
 from ._utils import EarlyStopping
 from ._model_config import get_device, get_model, get_criterion, get_optimizer
+from ..augment._utils import Augmentor
 from ..data import DOMAIN_NAMES, get_dataset
 from domgen.eval import get_features_with_reduction, visualize_features_by_block, reduce_features_by_block
 from domgen.augment._mixstyle import run_with_mixstyle, run_without_mixstyle
-from domgen.augment._mixup import mixup_data, mixup_criterion
 
 logging.basicConfig(
     level=logging.INFO,
@@ -71,47 +72,24 @@ def _checkpointing(
 class DomGenTrainer:
     def __init__(
             self,
-            model: str,
-            optimizer: str,
-            criterion: str,
-            dataset: str,
-            strategy: str = 'leave one out',
-            num_experiments: int = 1,
-            epochs_per_experiment: int = 10,
-            device: str = None,
-            use_early_stopping: bool = True,
-            use_scheduling: bool = True,
-            patience: int = 5,
-            delta: float = 0.1,
-            log_dir: str = 'experiments',
-            experiment: str = 'exp',
-            checkpoint_dir: str = 'checkpoints',
-            silent: bool = False,
-            use_mixup: bool = False,
-            mixup_alpha: float = 1.,
-            **kwargs
+            args: argparse.Namespace,
     ) -> None:
-        self.model = model
-        self.optimizer = optimizer
-        self.criterion = criterion
-        self.dataset = dataset
-        self.strategy = strategy
-        self.num_experiments = num_experiments
-        self.epochs_per_experiment = epochs_per_experiment
-        self.device = device if device else get_device()
-        self.use_early_stopping = use_early_stopping
-        self.use_scheduling = use_scheduling
-        self.patience = patience
-        self.delta = delta
-        self.log_dir = log_dir
-        self.experiment = experiment
-        self.silent = silent
-        self.use_mixup = use_mixup
-        self.mixup_alpha = mixup_alpha
+        self.model = args.model
+        self.optimizer = args.optimizer
+        self.criterion = args.criterion
+        self.dataset = args.dataset
+        self.num_experiments = args.num_runs
+        self.epochs_per_experiment = args.epochs
+        self.device = args.device if args.device else get_device()
+        self.log_dir = args.log_dir
+        self.experiment = args.experiment
+        self.silent = args.silent
+        os.makedirs(f'{self.log_dir}/{args.experiment}/checkpoints', exist_ok=True)
+        self.checkpoint_dir = f'{self.log_dir}/{args.experiment}/checkpoints'
+        self.augmentation_strategy = args.augmentation_strategy
 
-        os.makedirs(f'{self.log_dir}/{checkpoint_dir}', exist_ok=True)
-        self.checkpoint_dir = f'{self.log_dir}/{checkpoint_dir}'
-        self.args = kwargs
+        self.config = vars(args)
+        self.augmentor = None
 
         self.domains = DOMAIN_NAMES[self.dataset]
         self.metrics = {}
@@ -119,10 +97,10 @@ class DomGenTrainer:
         self.test_metrics = {}
 
         self.current_experiment = -1
-        if use_early_stopping:
+        if self.config.get('use_early_stopping', True):
             self.early_stopping = EarlyStopping(
-                patience=self.patience,
-                delta=self.delta,
+                patience=self.config.get('patience', 5),
+                delta=self.config.get('delta', 0.1),
                 mode='min'
             )
 
@@ -155,7 +133,7 @@ class DomGenTrainer:
             self.metrics[run]['test'] = self.test_metrics
             self.train_metrics = {}
             self.test_metrics = {}
-            if self.args.get('visualize_latent', 0):
+            if self.config.get('visualize_latent', 0):
                 block_features, labels = get_features_with_reduction(
                     model, train_loader, self.device, reduction='avg_pool'
                 )
@@ -192,34 +170,25 @@ class DomGenTrainer:
             """
         is_train = mode == 'train'
         model.train() if is_train else model.eval()
-        print(f'Status {mode}: ', model.mixstyle._active)
         total_loss = 0.0
         correct_predictions = 0
         total_predictions = 0
 
         with tqdm(loader, desc=mode.capitalize(), unit="batch", disable=self.silent) as batch:
             for inputs, labels in batch:
-                if mode == 'test':
-                    inputs, labels = inputs.to(self.device), labels.to(self.device)
-                else:
-                    inputs, labels = inputs['image'].to(self.device), labels.to(self.device)
+                inputs, labels = inputs['image'].to(self.device), labels.to(self.device)
 
-                if self.use_mixup:
-                    inputs, targets_a, targets_b, lam = mixup_data(
-                        x=inputs, y=labels, alpha=self.mixup_alpha, device=self.device
-                    )
+                if self.augmentor and is_train:
+                    inputs, labels = self.augmentor.apply_augment(inputs, labels)
+                    if self.augmentation_strategy in ['mixup', 'cutmix']:
+                        labels = torch.argmax(labels, dim=1)  # From one-hot encoded labels
 
                 if is_train:
                     optimizer.zero_grad()
 
                 with torch.set_grad_enabled(is_train):
                     outputs = model(inputs)
-                    if self.use_mixup:
-                        loss = mixup_criterion(
-                            criterion=criterion, pred=outputs, y_a=targets_a, y_b=targets_b, lam=lam
-                        )
-                    else:
-                        loss = criterion(outputs, labels)
+                    loss = criterion(outputs, labels)
 
                     if is_train:
                         loss.backward()
@@ -252,9 +221,11 @@ class DomGenTrainer:
             test_loader: torch.utils.data.DataLoader,
     ) -> Tuple[List[dict], dict]:
         train_writer, val_writer, test_writer = self._setup_tb_writers(self.log_dir)
-
         metrics_summary = []
-        scheduler = ReduceLROnPlateau(optimizer, patience=self.patience//2) if self.use_scheduling else None
+        # Todo: include other scheduling strategies -> get_scheduler function
+        scheduler = ReduceLROnPlateau(
+            optimizer, patience=self.config.get('patience', 5)//2
+        ) if self.config.get('use_scheduling', True) else None
         best_val_accuracy = 0.0
 
         for epoch in range(self.epochs_per_experiment):
@@ -299,18 +270,17 @@ class DomGenTrainer:
                 checkpoint_dir=self.checkpoint_dir,
                 is_last=last_epoch
             )
-
-            self.early_stopping(
-                score=val_loss,
-                epoch=epoch,
-                model=model,
-                optimizer=optimizer,
-                checkpoint_path=f"{self.checkpoint_dir}/best.pth"
-
-            )
-            if self.early_stopping.stop:
-                print(f"Training stopped early at epoch {epoch + 1}.")
-                break
+            if hasattr(self, 'early_stopping') and self.early_stopping:
+                self.early_stopping(
+                    score=val_loss,
+                    epoch=epoch,
+                    model=model,
+                    optimizer=optimizer,
+                    checkpoint_path=f"{self.checkpoint_dir}/best.pth"
+                )
+                if self.early_stopping.stop:
+                    logger.info(f"Training stopped early at epoch {epoch}.")
+                    break
 
         best_model_path = f"{self.checkpoint_dir}/best.pth"
         logger.info(f"Loading best model for testing from {best_model_path}")
@@ -331,23 +301,31 @@ class DomGenTrainer:
             self,
             idx: int
     ) -> Tuple:
+
+        logger.info("Using augmentation strategy:", self.augmentation_strategy)
+        self.augmentor = Augmentor(self.augmentation_strategy, **self.config)
+
+        augment = None
+        if self.augmentation_strategy == "custom":
+            augment = self.augmentor.strategy.strat
+
         dataset = get_dataset(
             name=self.dataset,
-            root_dir=self.args["dataset_dir"],
+            root_dir=self.config["dataset_dir"],
             test_domain=idx,
-            augment=self.args["augment"],
+            augment=augment,
         )
         train_loader, val_loader, test_loader = dataset.generate_loaders(
-            batch_size=self.args["batch_size"]
+            batch_size=self.config.get("batch_size", 32)
         )
         model = get_model(
-            self.model, dataset.num_classes, **self.args
+            self.model, dataset.num_classes, **self.config
         ).to(self.device)
         criterion = get_criterion(self.criterion)
         optimizer = get_optimizer(
             optimizer_name=self.optimizer,
             model_parameters=model.parameters(),
-            **self.args,
+            **self.config,
         )
         return model, criterion, optimizer, train_loader, val_loader, test_loader
 
@@ -355,7 +333,7 @@ class DomGenTrainer:
             self,
             log_dir: str
     ) -> Tuple[Optional[SummaryWriter], Optional[SummaryWriter], Optional[SummaryWriter]]:
-        if not self.args.get("tensorboard", False):
+        if not self.config.get("tensorboard", False):
             return None, None, None
 
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -395,16 +373,16 @@ class DomGenTrainer:
                 print(f'Saved testing metrics for {domain} in {run_folder}/{test_file}')
 
     def serialize_augmentations(self):
-        return {key: str(value.__class__) for key, value in self.args['augment'].items()}
+        return {key: str(value.__class__) for key, value in self.config['augment'].items()}
 
     def save_config(self, filename):
-        config = vars(self)
+        conf = vars(self)
 
-        if 'args' in config and 'augment' in config['args']:
-            config['args']['augment'] = self.serialize_augmentations()
-        if self.early_stopping:
-            config['early_stopping'] = self.early_stopping.serialize()
+        if 'config' in conf and 'augment' in conf['config']:
+            conf['config']['augment'] = self.serialize_augmentations()
+        if hasattr(self, 'early_stopping') and self.early_stopping:
+            conf['early_stopping'] = self.early_stopping.serialize()
 
         with open(filename, 'w') as f:
-            json.dump(config, f, indent=4)
+            json.dump(conf, f, indent=4)
         print(f"Configuration saved to {filename}")
