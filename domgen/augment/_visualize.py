@@ -3,6 +3,7 @@ import cv2
 import albumentations as A
 import matplotlib.pyplot as plt
 import torch
+from torchvision import transforms
 from albumentations.pytorch import ToTensorV2
 
 
@@ -55,12 +56,14 @@ def plot_single_augmented(
     ax[0].set_title("Original Image")
     ax[0].axis("off")
 
+    # ax[1].imshow(transformed_image.astype('uint8'))
     ax[1].imshow(transformed_image.permute(1, 2, 0).numpy().astype('uint8'))
     ax[1].set_title("Transformed Image")
     ax[1].axis("off")
 
     plt.tight_layout()
     plt.show()
+
 
 
 def plot_augmented_grid(
@@ -107,30 +110,112 @@ def plot_augmented_grid(
 
 
 def get_examples() -> Dict:
-    """Returns a dictionary of examples for the visualization functions."""
-    vertical = A.Compose([A.VerticalFlip(p=1), ToTensorV2()])
-    horizontal = A.Compose([A.HorizontalFlip(p=1), ToTensorV2()])
-    colorjitter = A.Compose([A.ColorJitter(), ToTensorV2()])
-    rotate = A.Compose([A.RandomRotate90(p=1), ToTensorV2()])
-    brightness_contrast = A.Compose([A.RandomBrightnessContrast(p=1), ToTensorV2()])
-    gaussian_blur = A.Compose([A.GaussianBlur(blur_limit=(13, 21), p=1), ToTensorV2()])
-    clahe = A.Compose([A.CLAHE(p=1), ToTensorV2()])
-    sharpen = A.Compose([A.Sharpen(p=1), ToTensorV2()])
-    hue_saturation = A.Compose([A.HueSaturationValue(p=1), ToTensorV2()])
-    solarize = A.Compose([A.Solarize(p=1), ToTensorV2()])
-    equalize = A.Compose([A.Equalize(p=1), ToTensorV2()])
+    """
+    Returns a dictionary of examples for the visualization functions.
+    Probabilities are adapted to show up for every visualization attempt.
+    """
 
-    augmentations = {
-        "Vertical Flip": vertical,
-        "Horizontal Flip": horizontal,
-        "Color Jitter": colorjitter,
-        "Rotate 90°": rotate,
-        "Brightness/Contrast": brightness_contrast,
-        "Gaussian Blur": gaussian_blur,
+    blur = A.Compose([A.Blur((3, 7), 1), ToTensorV2()])
+    channel_dropout = A.Compose([A.ChannelDropout((1, 2), 128, p=1), ToTensorV2()])
+    clahe = A.Compose([A.CLAHE((1, 4), (8, 8), False, 1), ToTensorV2()])
+    color_jitter = A.Compose([A.ColorJitter(0.2, 0.2, 0.2, 0.1, 1), ToTensorV2()])
+    defocus = A.Compose([A.Defocus((4, 8), (0.2, 0.4), True), ToTensorV2()])
+    fancyPCA = A.Compose([A.FancyPCA(0.1, 1, True), ToTensorV2()])
+    glass_blur = A.Compose([A.GlassBlur(0.7, 4, 3, "fast", False, 1), ToTensorV2()])
+    gaussian_noise = A.Compose([A.GaussNoise(std_range=(0.1, 0.2), p=1), ToTensorV2()])
+    grid_distortion = A.Compose([A.GridDistortion(5, (-0.3, 0.3), p=1), ToTensorV2()])
+    grid_dropout = A.Compose([A.GridDropout(ratio=0.3, unit_size_range=(10, 20), random_offset=True, p=1), ToTensorV2()])
+    grid_elastic_deform = A.Compose([A.GridElasticDeform(num_grid_xy=(4, 4), magnitude=10, p=1), ToTensorV2()])
+    horizontal_flip = A.Compose([A.HorizontalFlip(p=1), ToTensorV2()])
+    hue_saturation_value = A.Compose([A.HueSaturationValue((-20, 20), (-30, 30), (-20, 20), p=1), ToTensorV2()])
+    iso_noise = A.Compose([A.ISONoise((0.01, 0.05), (0.1, 0.5), p=1), ToTensorV2()])
+    median_blur = A.Compose([A.MedianBlur(7, 1), ToTensorV2()])
+    noop = A.Compose([A.NoOp(), ToTensorV2()])
+    pixel_dropout = A.Compose([A.PixelDropout(0.01, False, 0, None, True), ToTensorV2()])
+    random_brightness_contrast = A.Compose([A.RandomBrightnessContrast((-0.2, 0.2), (-0.2, 0.2), True, False, p=1), ToTensorV2()])
+    random_gamma = A.Compose([A.RandomGamma((80, 120), p=1), ToTensorV2()])
+    random_resized_crop = A.Compose([A.RandomResizedCrop((512, 320), scale=(0.08, 1), ratio=(0.75, 1.3333333333333333), p=1), ToTensorV2()])
+    random_tone_curve = A.Compose([A.RandomToneCurve(0.1, False, p=0.1), ToTensorV2()])
+    rotate = A.Compose([A.Rotate((-90, 90), interpolation=1, border_mode=4, rotate_method='largest_box',
+                       crop_border=False, mask_interpolation=0, fill=False, fill_mask=0, p=0.5), ToTensorV2()])
+    sharpen = A.Compose([A.Sharpen((0.2, 0.5), (0.5, 1), 'kernel', 5, 1, 1), ToTensorV2()])
+    shift_scale_rotate = A.Compose([A.ShiftScaleRotate((-0.0625, 0.0625), (-0.1, 0.1), (-90, 90), 1, 4, shift_limit_x=None,
+                                             shift_limit_y=None, mask_interpolation=0, fill=0, fill_mask=0, p=1), ToTensorV2()])
+    solarize = A.Compose([A.Solarize(threshold=(0.5, 0.5), p=1), ToTensorV2()])
+    spatter = A.Compose([A.Spatter((0.65, 0.65), (0.3, 0.3), (2, 2), (0.68, 0.68), (0.6, 0.6), 'rain', color=None, p=1), ToTensorV2()])
+    transpose = A.Compose([A.Transpose(p=1), ToTensorV2()])
+    xy_masking = A.Compose([A.XYMasking((1, 3), (1, 3), (10, 20), (10, 20), fill=0, fill_mask=0, p=1), ToTensorV2()])
+
+    # custom
+    carlucci_1 = A.Compose([A.RandomResizedCrop(height=256, width=256, scale=(0.8, 1.0)), A.HorizontalFlip(p=1), ToTensorV2()])
+    carlucci_2 = A.Compose([A.ToGray(p=1), ToTensorV2()])
+    carlucci_3 = A.Compose([A.RandomResizedCrop(height=256, width=256, scale=(0.8, 1.0)), A.HorizontalFlip(p=1), A.ToGray(p=1), ToTensorV2()])
+    wang_1 = A.Compose([A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=1), ToTensorV2()])
+    wang_2 = A.Compose([A.RandomResizedCrop(height=256, width=256, scale=(0.8, 1.0)), A.HorizontalFlip(p=1), A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=1), ToTensorV2()])
+    zhou = A.Compose([A.Resize(height=int(256 * 1.25), width=int(256 * 1.25)), A.RandomCrop(height=256, width=256), A.HorizontalFlip(p=1), ToTensorV2()])
+    color_geometric = A.Compose([A.ColorJitter(0.2, 0.2, 0.2, 0.1, p=1), A.Rotate((-45, 45), interpolation=1, border_mode=4, p=1), A.HorizontalFlip(p=1), ToTensorV2()])
+    color_distortion = A.Compose([A.HueSaturationValue((-20, 20), (-30, 30), (-20, 20), p=1), A.GridDistortion(5, (-0.3, 0.3), p=1), A.Transpose(p=1), ToTensorV2()])
+    contrast_geometric = A.Compose([A.CLAHE((1, 4), (8, 8), always_apply=False, p=1), A.RandomResizedCrop((512, 320), scale=(0.08, 1), ratio=(0.75, 1.33), p=1), A.Rotate((-90, 90), interpolation=1, border_mode=4, p=1), ToTensorV2()])
+    noise_geometric = A.Compose([A.GaussNoise(std_range=(0.1, 0.2), p=1), A.Rotate((-45, 45), interpolation=1, border_mode=4, p=1), A.HorizontalFlip(p=1), ToTensorV2()])
+    noise_color_geometric = A.Compose([A.Defocus(radius=(4, 8), alias_blur=(0.2, 0.4), p=1), A.ColorJitter(0.2, 0.2, 0.2, 0.1, p=1), A.HorizontalFlip(p=1), ToTensorV2()])
+    masking_color = A.Compose([A.Solarize(threshold=0.5, p=1), A.GridDropout(ratio=0.3, unit_size_min=10, unit_size_max=20, random_offset=True, p=1.0), A.HueSaturationValue((-20, 20), (-30, 30), (-20, 20), p=1), ToTensorV2()])
+    masking_noise = A.Compose([A.XYMasking((1, 3), (1, 3), (10, 20), (10, 20), fill=0, fill_mask=0, p=1),A.GaussNoise(std_range=(0.1, 0.3), p=1), A.Rotate((-30, 30), p=1), ToTensorV2()])
+    distortion_noise = A.Compose([A.GridDistortion(num_steps=5, distort_limit=(-0.4, 0.4), p=1),A.Defocus(radius=(3, 6), alias_blur=(0.1, 0.3), p=1), A.Transpose(p=0.5),ToTensorV2()])
+    color_mask_geometric = A.Compose([A.Solarize(threshold=0.5, p=1), A.XYMasking((1, 2), (1, 3), (15, 25), (15, 25), fill=0, fill_mask=0, p=1),A.Rotate((-90, 90), p=1), ToTensorV2()])
+
+    pacs = {
+        "Channel Dropout": channel_dropout,
         "CLAHE": clahe,
-        "Sharpen": sharpen,
-        "Hue Saturation": hue_saturation,
+        "Color Jitter": color_jitter,
+        "Grid Elastic Deform": grid_elastic_deform,
+        "Hue Saturation": hue_saturation_value,
         "Solarize": solarize,
-        "Equalize": equalize,
+        "XY Masking": xy_masking
     }
-    return augmentations
+
+    camelyon17 = {
+        "Fancy PCA": fancyPCA,
+        "Glass Blur": glass_blur,
+        "ISO Noise": iso_noise,
+        "Median Blur": median_blur,
+        "Random Brightness/Contrast": random_brightness_contrast,
+        "Random Gamma": random_gamma,
+        "Random Tone-Curve": random_tone_curve,
+        "Sharpen": sharpen,
+        "Shift/Sale/Rotate": shift_scale_rotate,
+        "Spatter": spatter
+    }
+
+    shared = {
+        "Blur": blur,
+        "Defocus": defocus,
+        "Gaussian Noise": gaussian_noise,
+        "Grid Distortion": grid_distortion,
+        "Grid Dropout": grid_dropout,
+        "Horizontal Flip": horizontal_flip,
+        "Pixel Dropout": pixel_dropout,
+        "Random Resized Crop": random_resized_crop,
+        "Rotate": rotate,
+        "Transpose": transpose
+    }
+
+    custom_aug = {
+        "Carlucci et al. (2019): 1": carlucci_1,
+        "Carlucci et al. (2019): 2": carlucci_2,
+        "Carlucci et al. (2019): 3": carlucci_3,
+        "Wang et al. (2020): 1": wang_1,
+        "Wang et al. (2020): 2": wang_2,
+        "Zhou et al. (2020)": zhou,
+        "ColorJitter + Rotate + H.Flip": color_geometric,
+        "HueSaturation + GridDistortion + Transpose": color_distortion,
+        "CLAHE + RandomResizedCrop + Transpose": contrast_geometric,
+        "GaussNoise + Rotate + H.Flip": noise_geometric,
+        "Defocus + ColorJitter + H.Flip": noise_color_geometric,
+        "Solarize + GridDropout + HueSaturation": masking_color,
+        "XY Mask + GaussNoise + Rotate": masking_noise,
+        "GridDistortion + Defocus + Transpose": distortion_noise,
+        "Solarize + XY Mask + Rotate": color_mask_geometric
+    }
+
+    return custom_aug
+
