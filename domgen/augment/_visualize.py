@@ -3,8 +3,9 @@ import cv2
 import albumentations as A
 import matplotlib.pyplot as plt
 import torch
-from torchvision import transforms
 from albumentations.pytorch import ToTensorV2
+from PIL import Image
+from pathlib import Path
 
 
 def denormalize(
@@ -104,6 +105,47 @@ def plot_augmented_grid(
 
     for ax in axes[len(augment_transforms):]:
         ax.axis("off")
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_images_from_folder(
+        folder_path: str,
+        original_image_path: str,
+        grid_cols: int = 4,
+        file_extensions: tuple = (".png", ".jpg", ".jpeg")
+):
+    """
+    Reads images from a folder and plots them in a grid.
+
+    :param folder_path: Path to the folder containing images.
+    :param original_image_path: Path to the original image to include as the first image.
+    :param grid_cols: Number of columns in the grid layout. Defaults to 4.
+    :param file_extensions: Tuple of valid image file extensions to consider.
+    """
+    folder = Path(folder_path)
+    image_paths = [p for p in folder.iterdir() if p.suffix.lower() in file_extensions]
+
+    if not image_paths:
+        print("No images found in the folder.")
+        return
+
+    image_paths.insert(0, Path(original_image_path))
+
+    grid_rows = (len(image_paths) + grid_cols - 1) // grid_cols
+
+    fig, axes = plt.subplots(grid_rows, grid_cols, figsize=(4 * grid_cols, 4 * grid_rows))
+    axes = axes.flatten()
+
+    for idx, ax in enumerate(axes):
+        if idx < len(image_paths):
+            img = Image.open(image_paths[idx])
+            ax.imshow(img)
+            ax.set_title(image_paths[idx].name)
+            ax.axis("off")
+        else:
+            ax.axis("off")
 
     plt.tight_layout()
     plt.show()
@@ -217,5 +259,5 @@ def get_examples() -> Dict:
         "Solarize + XY Mask + Rotate": color_mask_geometric
     }
 
-    return custom_aug
+    return shared
 
