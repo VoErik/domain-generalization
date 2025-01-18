@@ -1,6 +1,6 @@
-from typing import Any
 from torchvision.transforms import InterpolationMode, v2
 from domgen.augment import create_augmentation_pipeline
+from domgen.augment._transforms import PACS_CUSTOM
 
 
 
@@ -101,6 +101,16 @@ class CustomAugment(Strategy):
     def __call__(self, img, labels):
         return img, labels
 
+class PACSCustom(Strategy):
+    augments = PACS_CUSTOM
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.aug_dict = PACS_CUSTOM[kwargs.get("aug_dict", {})]
+        self.strat = create_augmentation_pipeline(self.aug_dict)
+
+    def __call__(self, img, labels):
+        return img, labels
+
 AUG_STRATEGIES = {
     "no_augment": NoAugment,
     "mixup": MixUpStrategy,
@@ -108,7 +118,7 @@ AUG_STRATEGIES = {
     "augmix": AugMixStrategy,
     "randaugment": RandAugmentStrategy,
     "mixstyle": MixStyleStrategy,
-    "custom": CustomAugment
+    "pacs_custom": PACSCustom,
 }
 
 class Augmentor:
