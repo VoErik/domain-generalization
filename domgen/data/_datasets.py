@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, ConcatDataset, Subset
 from torchvision.datasets import ImageFolder
 from domgen.augment import imagenet_transform
-from domgen.augment._transforms import combine_augmentations, create_augmentation_pipeline, no_transform
+from domgen.augment._transforms import combine_augmentations, create_augmentation_pipeline
 from domgen.augment._transforms import all_augmentations, pacs_aug, camelyon17_aug, shared_aug
 
 """To add a new dataset, just create a class that inherits from `DomainDataset`."""
