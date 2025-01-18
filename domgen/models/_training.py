@@ -13,7 +13,7 @@ from tqdm import tqdm
 import logging
 from ._utils import EarlyStopping
 from ._model_config import get_device, get_model, get_criterion, get_optimizer
-from ..augment._utils import Augmentor
+from ..augment._augmentor import Augmentor
 from ..data import DOMAIN_NAMES, get_dataset
 from domgen.eval import get_features_with_reduction, visualize_features_by_block, reduce_features_by_block
 from domgen.augment._mixstyle import run_with_mixstyle, run_without_mixstyle
@@ -302,7 +302,10 @@ class DomGenTrainer:
             idx: int
     ) -> Tuple:
 
-        logger.info("Using augmentation strategy:", self.augmentation_strategy)
+        if "_custom" in self.augmentation_strategy:
+            logger.info(f"Using augmentation strategy: {self.augmentation_strategy}-{self.config["aug_dict"]}")
+        else:
+            logger.info(f"Using augmentation strategy: {self.augmentation_strategy}")
         self.augmentor = Augmentor(self.augmentation_strategy, **self.config)
 
         augment = None
