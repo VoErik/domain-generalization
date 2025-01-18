@@ -4,7 +4,7 @@ dataset: "PACS"
 dataset_dir: "datasets"
 
 # Training hyperparameters
-lr: 1e-3
+lr: 0.001
 batch_size: 32
 momentum: 0.9 # not used
 weight_decay: 0
@@ -19,7 +19,7 @@ nesterov: None # not used
 
 # Early stopping and scheduling
 use_early_stopping: true
-patience: 8
+patience: 6
 use_scheduling: true
 
 # Device and pretraining
@@ -28,20 +28,9 @@ pretrained: true
 
 # Experiment details
 log_dir: "experiments"
-experiment: "resnet18-pt-randaugment-pacs"
+experiment: "resnet18-pt-custom-noise_color_geometric-pacs"
 num_runs: 10
 
 # Augmentations
-mixstyle_layers: None
-mixstyle_alpha: 0.3
-mixstyle_p: 0.5
-mix_type: "random"
-visualize_latent: false
-use_mixup: false
-use_cutmix: false
-use_augmix: false
-use_randaugment: true
-mixup_alpha: 0.3
-cutmix_alpha: 0.2
-augmix_severity: 3
-num_ops: 1
+augmentation_strategy: "pacs_custom"
+aug_dict: "noise_color_geometric"
