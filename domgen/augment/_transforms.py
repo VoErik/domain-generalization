@@ -1,10 +1,13 @@
 from typing import Tuple
 import torchvision
+from PIL import Image
 from torchvision import transforms
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from albumentations import Compose
 import numpy as np
+import torch
+
 
 
 class Transforms:
@@ -14,10 +17,36 @@ class Transforms:
     def __call__(self, img, *args, **kwargs):
         return self.transform(image=np.array(img))
 
+class TransformsWrapper:
+    def __init__(self, albumentations_transform=None, torchvision_transform=None):
+        self.albumentations_transform = albumentations_transform
+        self.torchvision_transform = torchvision_transform
+
+    def __call__(self, img):
+        # If Torchvision transform is provided, apply it
+        if self.torchvision_transform:
+            # Ensure the input is a PIL image (required by Torchvision)
+            if isinstance(img, np.ndarray):  # Convert NumPy to PIL
+                img = Image.fromarray(img)
+            img = self.torchvision_transform(img)  # Apply Torchvision transforms
+
+        # If Albumentations transform is provided, apply it
+        if self.albumentations_transform:
+            # Ensure the input is a NumPy array (required by Albumentations)
+            if isinstance(img, torch.Tensor):  # Convert PyTorch tensor to NumPy
+                img = img.permute(1, 2, 0).numpy()
+            elif isinstance(img, Image.Image):  # Convert PIL to NumPy
+                img = np.array(img)
+            augmented = self.albumentations_transform(image=img)
+            img = augmented['image']  # Extract the transformed image
+            # Convert back to PyTorch tensor if necessary
+
+        return img
+
 
 def imagenet_transform(
         input_size: Tuple[int, int]
-) -> Transforms:
+) -> TransformsWrapper:
     transform = A.Compose([
         A.Resize(input_size[0], input_size[1]),
         A.Normalize(
@@ -26,10 +55,10 @@ def imagenet_transform(
         ),
         ToTensorV2()
     ])
-    return Transforms(transform)
+    return TransformsWrapper(albumentations_transform=transform)
 
 
-def create_augmentation_pipeline(augmentations: dict) -> Transforms:
+def create_augmentation_pipeline(augmentations: dict) -> TransformsWrapper:
     pipeline = []
     for key, aug in augmentations.items():
         pipeline.append(A.OneOrOther(A.NoOp(), aug))
@@ -39,7 +68,7 @@ def create_augmentation_pipeline(augmentations: dict) -> Transforms:
     ))
     pipeline.append(ToTensorV2())
 
-    augment = Transforms(A.Compose(pipeline))
+    augment = TransformsWrapper(albumentations_transform=A.Compose(pipeline))
 
     return augment
 
