@@ -5,9 +5,6 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 from albumentations import Compose
 import numpy as np
-import medmnistc
-from medmnistc.augmentation import AugMedMNISTC
-from medmnistc.corruptions.registry import CORRUPTIONS_DS
 
 
 class Transforms:
@@ -20,15 +17,16 @@ class Transforms:
 
 def imagenet_transform(
         input_size: Tuple[int, int]
-) -> torchvision.transforms.Compose:
-    transform = transforms.Compose([
-        transforms.Resize(input_size),
-        transforms.ToTensor(),
-        transforms.Normalize(
+) -> Transforms:
+    transform = A.Compose([
+        A.Resize(input_size[0], input_size[1]),
+        A.Normalize(
             mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225])
+            std=[0.229, 0.224, 0.225]
+        ),
+        ToTensorV2()
     ])
-    return transform
+    return Transforms(transform)
 
 
 def create_augmentation_pipeline(augmentations: dict) -> Transforms:
@@ -129,137 +127,70 @@ shared_aug = {
     "transpose": A.Transpose(p=0.5)
 }
 
-"""
-Carlucci, F. M., D'Innocente, A., Bucci, S., Caputo, B., & Tommasi, T. (2019). 
-Domain generalization by solving jigsaw puzzles. 
-In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition (pp. 2229-2238).
-"""
+"""Custom Augmentations for the PACS dataset"""
 
-carlucci_1 = A.Compose([
-    A.RandomResizedCrop(height=256, width=256, scale=(0.8, 1.0)),
-    A.HorizontalFlip(p=0.5)
-    # ToTensorV2()
-])
+color_geometric_aug = {
+    "color_jitter": A.ColorJitter(0.2, 0.2, 0.2, 0.1, p=1),
+    "rotate": A.Rotate((-45, 45), interpolation=1, border_mode=4, p=0.5),
+    "horizontal_flip": A.HorizontalFlip(p=0.5)
+}
 
-carlucci_2 = A.Compose([
-    A.ToGray(p=0.1)
-    # ToTensorV2()
-])
+color_distortion_aug = {
+    "hue_saturation_value": A.HueSaturationValue((-20, 20), (-30, 30), (-20, 20), p=1),
+    "grid_distortion": A.GridDistortion(5, (-0.3, 0.3), p=0.5),
+    "transpose": A.Transpose(p=0.5)
+}
 
-carlucci_3 = A.Compose([
-    A.RandomResizedCrop(height=256, width=256, scale=(0.8, 1.0)),
-    A.HorizontalFlip(p=0.5),
-    A.ToGray(p=0.1)
-    # ToTensorV2()
-])
+contrast_geometric_aug = {
+    "clahe": A.CLAHE((1, 4), (8, 8), always_apply=False, p=1),
+    "random_resized_crop": A.RandomResizedCrop((512, 320), scale=(0.08, 1), ratio=(0.75, 1.33), p=1),
+    "rotate": A.Rotate((-90, 90), interpolation=1, border_mode=4, p=0.5)
+}
 
-"""
-Wang, S., Yu, L., Li, C., Fu, C. W., & Heng, P. A. (2020). 
-Learning from extrinsic and intrinsic supervisions for domain generalization. 
-In European Conference on Computer Vision (pp. 159-176). Cham: Springer International Publishing.
-"""
+noise_geometric_aug = {
+    "gauss_noise": A.GaussNoise(std_range=(0.1, 0.2), p=1),
+    "rotate": A.Rotate((-45, 45), interpolation=1, border_mode=4, p=0.5),
+    "horizontal_flip": A.HorizontalFlip(p=0.5)
+}
 
-wang_1 = A.Compose([
-    A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=0.5)
-    # ToTensorV2()
-])
+noise_color_geometric_aug = {
+    "defocus": A.Defocus(radius=(4, 8), alias_blur=(0.2, 0.4), p=1),
+    "color_jitter": A.ColorJitter(0.2, 0.2, 0.2, 0.1, p=1),
+    "horizontal_flip": A.HorizontalFlip(p=0.5)
+}
 
-wang_2 = A.Compose([
-    A.RandomResizedCrop(height=256, width=256, scale=(0.8, 1.0)),
-    A.HorizontalFlip(p=0.5),
-    A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=0.5)
-    # ToTensorV2()
-])
+masking_color_aug = {
+    "solarize": A.Solarize(threshold=0.5, p=1),
+    "grid_dropout": A.GridDropout(ratio=0.3, unit_size_min=10, unit_size_max=20, random_offset=True, p=1.0),
+    "hue_saturation_value": A.HueSaturationValue((-20, 20), (-30, 30), (-20, 20), p=1)
+}
 
-"""
-Zhou, K., Yang, Y., Hospedales, T., & Xiang, T. (2020). 
-Deep domain-adversarial image generation for domain generalisation. 
-In Proceedings of the AAAI conference on artificial intelligence (Vol. 34, No. 07, pp. 13025-13032).
-"""
+masking_noise_aug = {
+    "xy_masking": A.XYMasking((1, 3), (1, 3), (10, 20), (10, 20), fill=0, fill_mask=0, p=1),
+    "gauss_noise": A.GaussNoise(std_range=(0.1, 0.3), p=1),
+    "rotate": A.Rotate((-30, 30), p=0.5)
+}
 
-zhou = A.Compose([
-    A.Resize(height=int(256 * 1.25), width=int(256 * 1.25)),
-    A.RandomCrop(height=256, width=256),
-    A.HorizontalFlip(p=0.5)
-    # ToTensorV2()
-])
+distortion_noise_aug = {
+    "grid_distortion": A.GridDistortion(num_steps=5, distort_limit=(-0.4, 0.4), p=1),
+    "defocus": A.Defocus(radius=(3, 6), alias_blur=(0.1, 0.3), p=1),
+    "transpose": A.Transpose(p=0.5)
+}
 
-"""
-Specifically for Camelyon17:
+color_mask_geometric_aug = {
+    "solarize": A.Solarize(threshold=0.5, p=1),
+    "xy_masking": A.XYMasking((1, 2), (1, 3), (15, 25), (15, 25), fill=0, fill_mask=0, p=1),
+    "rotate": A.Rotate((-90, 90), p=0.5)
+}
 
-Di Salvo, F., Doerrich, S., & Ledig, C. (2024). 
-MedMNIST-C: Comprehensive benchmark and improved classifier robustness by simulating realistic image corruptions. 
-arXiv preprint arXiv:2406.17536.
-"""
-
-dataset = "pathmnist"
-train_corruptions = CORRUPTIONS_DS[dataset]
-
-augment = AugMedMNISTC(train_corruptions)
-
-diSalvo = transforms.Compose([
-    AugMedMNISTC(train_corruptions)
-    # transforms.ToTensor(),
-    # transforms.Normalize(mean=..., std=...)
-])
-
-
-"""
-Custom augmentations
-"""
-
-color_geometric = A.Compose([
-    A.ColorJitter(0.2, 0.2, 0.2, 0.1, p=1),
-    A.Rotate((-45, 45), interpolation=1, border_mode=4, p=0.5),
-    A.HorizontalFlip(p=0.5)
-])
-
-color_distortion = A.Compose([
-    A.HueSaturationValue((-20, 20), (-30, 30), (-20, 20), p=1),
-    A.GridDistortion(5, (-0.3, 0.3), p=0.5),
-    A.Transpose(p=0.5)
-])
-
-contrast_geometric = A.Compose([
-    A.CLAHE((1, 4), (8, 8), always_apply=False, p=1),
-    A.RandomResizedCrop((512, 320), scale=(0.08, 1), ratio=(0.75, 1.33), p=1),
-    A.Rotate((-90, 90), interpolation=1, border_mode=4, p=0.5)
-])
-
-noise_geometric = A.Compose([
-    A.GaussNoise(std_range=(0.1, 0.2), p=1),
-    A.Rotate((-45, 45), interpolation=1, border_mode=4, p=0.5),
-    A.HorizontalFlip(p=0.5)
-])
-
-noise_color_geometric = A.Compose([
-    A.Defocus(radius=(4, 8), alias_blur=(0.2, 0.4), p=1),
-    A.ColorJitter(0.2, 0.2, 0.2, 0.1, p=1),
-    A.HorizontalFlip(p=0.5)
-])
-
-masking_color = A.Compose([
-    A.Solarize(threshold=0.5, p=1),
-    A.GridDropout(ratio=0.3, unit_size_min=10, unit_size_max=20, random_offset=True, p=1.0),
-    A.HueSaturationValue((-20, 20), (-30, 30), (-20, 20), p=1)
-])
-
-masking_noise = A.Compose([
-    A.XYMasking((1, 3), (1, 3), (10, 20), (10, 20), fill=0, fill_mask=0, p=1),
-    A.GaussNoise(std_range=(0.1, 0.3), p=1),
-    A.Rotate((-30, 30), p=0.5)
-])
-
-distortion_noise = A.Compose([
-    A.GridDistortion(num_steps=5, distort_limit=(-0.4, 0.4), p=1),
-    A.Defocus(radius=(3, 6), alias_blur=(0.1, 0.3), p=1),
-    A.Transpose(p=0.5)
-])
-
-# should emphasize edges, mask & rotate for variability
-# for more extractable features
-color_mask_geometric = A.Compose([
-    A.Solarize(threshold=0.5, p=1),
-    A.XYMasking((1, 2), (1, 3), (15, 25), (15, 25), fill=0, fill_mask=0, p=1),
-    A.Rotate((-90, 90), p=0.5)
-])
+PACS_CUSTOM = {
+    "color_geometric": color_geometric_aug,
+    "color_distortion": color_distortion_aug,
+    "contrast_geometric": contrast_geometric_aug,
+    "noise_geometric": noise_geometric_aug,
+    "noise_color_geometric": noise_color_geometric_aug,
+    "masking_color": masking_color_aug,
+    "masking_noise": masking_noise_aug,
+    "distortion_noise": distortion_noise_aug,
+    "color_mask_geometric": color_mask_geometric_aug,
+}
