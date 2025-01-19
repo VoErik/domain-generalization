@@ -271,5 +271,11 @@ def get_examples() -> Dict:
         "Solarize + XY Mask + Rotate": color_mask_geometric
     }
 
-    return custom_aug
+    presentation = {
+        "Color + Masking + Geometric": color_mask_geometric,
+        "Noise + Geometric": noise_geometric,
+        "Mask + Color": masking_color
+    }
+
+    return presentation
 
