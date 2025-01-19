@@ -176,7 +176,7 @@ class DomGenTrainer:
 
         with tqdm(loader, desc=mode.capitalize(), unit="batch", disable=self.silent) as batch:
             for inputs, labels in batch:
-                inputs, labels = inputs['image'].to(self.device), labels.to(self.device)
+                inputs, labels = inputs.to(self.device), labels.to(self.device)
 
                 if self.augmentor and is_train:
                     inputs, labels = self.augmentor.apply_augment(inputs, labels)
@@ -304,13 +304,16 @@ class DomGenTrainer:
 
         if "_custom" in self.augmentation_strategy:
             logger.info(f"Using augmentation strategy: {self.augmentation_strategy}-{self.config["aug_dict"]}")
+        elif self.augmentation_strategy == "medmnistc":
+            logger.info(f"Using augmentation strategy: {self.augmentation_strategy}-{self.config["aug_dict"]}")
         else:
             logger.info(f"Using augmentation strategy: {self.augmentation_strategy}")
         self.augmentor = Augmentor(self.augmentation_strategy, **self.config)
 
         augment = None
-        if self.augmentation_strategy == "custom":
+        if self.augmentation_strategy == "custom" or self.augmentation_strategy == "medmnistc":
             augment = self.augmentor.strategy.strat
+
 
         dataset = get_dataset(
             name=self.dataset,
