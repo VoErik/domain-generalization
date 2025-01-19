@@ -1,7 +1,10 @@
 from torchvision.transforms import InterpolationMode, v2
 from domgen.augment import create_augmentation_pipeline
-from domgen.augment._transforms import PACS_CUSTOM
+from domgen.augment._transforms import PACS_CUSTOM, TransformsWrapper
 
+from medmnistc.augmentation import AugMedMNISTC
+from medmnistc.corruptions.registry import CORRUPTIONS_DS
+import torchvision.transforms as transforms
 
 
 class Strategy:
@@ -111,6 +114,26 @@ class PACSCustom(Strategy):
     def __call__(self, img, labels):
         return img, labels
 
+class MedMNISTC(Strategy):
+    """
+    Wrapper class for MedMNISTC.
+    DiSalvo et al. 2024: https://github.com/francescodisalvo05/medmnistc-api/tree/main
+    """
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.dataset = kwargs.get("aug_dict", "pathmnist")
+        self.augments = CORRUPTIONS_DS[self.dataset]
+        self.strat = TransformsWrapper(torchvision_transform=transforms.Compose([
+            AugMedMNISTC(self.augments),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225]
+            )]))
+
+    def __call__(self, img, labels):
+        return img, labels
+
 AUG_STRATEGIES = {
     "no_augment": NoAugment,
     "mixup": MixUpStrategy,
@@ -119,6 +142,7 @@ AUG_STRATEGIES = {
     "randaugment": RandAugmentStrategy,
     "mixstyle": MixStyleStrategy,
     "pacs_custom": PACSCustom,
+    "medmnistc": MedMNISTC
 }
 
 class Augmentor:
