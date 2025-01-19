@@ -241,7 +241,7 @@ def get_examples() -> Dict:
         "Transpose": transpose
     }
 
-    custom_aug = {
+    all_custom_aug = {
         "Carlucci et al. (2019): 1": carlucci_1,
         "Carlucci et al. (2019): 2": carlucci_2,
         "Carlucci et al. (2019): 3": carlucci_3,
@@ -259,5 +259,17 @@ def get_examples() -> Dict:
         "Solarize + XY Mask + Rotate": color_mask_geometric
     }
 
-    return shared
+    custom_aug = {
+        "ColorJitter + Rotate + H.Flip": color_geometric,
+        "HueSaturation + GridDistortion + Transpose": color_distortion,
+        "CLAHE + RandomResizedCrop + Transpose": contrast_geometric,
+        "GaussNoise + Rotate + H.Flip": noise_geometric,
+        "Defocus + ColorJitter + H.Flip": noise_color_geometric,
+        "Solarize + GridDropout + HueSaturation": masking_color,
+        "XY Mask + GaussNoise + Rotate": masking_noise,
+        "GridDistortion + Defocus + Transpose": distortion_noise,
+        "Solarize + XY Mask + Rotate": color_mask_geometric
+    }
+
+    return custom_aug
 
