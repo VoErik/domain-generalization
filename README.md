@@ -1,55 +1,111 @@
 
+# Data Augmentation for Domain Generalization
+
+---
+
+Short description of what we do.
+
 ## Installation
+
+---
+
+
+
+
++ add requirements
+
+## Components
+
+---
+
+* `domgen/augmentor.py`: Definition of augmentation strategies that are handled by an `Augmentor` class during training.
+* `domgen/trainer.py`: Handling of the training process based on a configuration file.
+* `domgen/tuning.py`: Classes for hyperparameter and augmentation tuning.
+* `domgen/domain_dataset.py`: Definition of a dataset class to handle specific domain datasets.
+
+## Quickstart
+
+---
+
+### Setup
+
 From `root` run:
 ```console
 python -m pip install -e .
 ```
 
-## Hyperparameters
+### Using the Trainer
 
-We ran a basic hyperparameter search for each leave-out split using `raytune`. For each trial run we sampled 30 times and trained for 10 (pretrained) or 100 (new initialization) epochs. Generally, no clear inter-domain agreement on **a** best hyperparameter configuration could be found. Instead, we opted for the agreed upon set with the highest validation accuracy each, with no validation accuracy < 92%.
+To run experiments, simply instatiate an instance of the `DomGenTrainer`, pass a configuration by either:
+* defining a `config.yaml` (`.json`) file and passing it via the `--config` flag when running `train.py` or
+* defining a `dataclass` or similar and passing it to the trainer.
 
-| Model            | LR     | Batch Size | Weight Decay | Optimizer | Betas       | Eps  |
-|------------------|--------|------------|--------------|-----------|-------------|------|
-| Resnet18 (pt)    | 1e-3   | 64         | 0.1          | AdamW     | 0.9, 0.999  | 1e-8 |
-| Resnet34 (pt)    | 1e-3   | 64         | 0.1          | AdamW     | 0.9, 0.999  | 1e-8 |
-| Resnet50 (pt)    | 1e-3   | 64         | 0.1          | AdamW     | 0.9, 0.999  | 1e-8 |
-| Resnet18         | 1e-3   | 64         | 0.1          | AdamW     | 0.9, 0.999  | 1e-8 |
-| Resnet34 (pt)    | 1e-3   | 64         | 0.1          | AdamW     | 0.9, 0.999  | 1e-8 |
-| Resnet50 (pt)    | 1e-3   | 64         | 0.1          | AdamW     | 0.9, 0.999  | 1e-8 |
-| Densenet121 (pt) | 1e-3   | 48         | 0            | Adam      | 0.9, 0.999  | 1e-8 |
-| Densenet161 (pt) | 1e-3   | 32         | 0.003        | AdamW     | 0.9, 0.95   | 1e-8 |
-| Densenet121      | 1e-3   | 48         | 0            | Adam      | 0.99, 0.999 | 1e-8 | 
-| Densenet161      | 1e-3   | 32         | 0            | Adam      | 0.99, 0.999 | 1e-8 | 
 
-*(pt) = pre-trained (ImageNet weights).*
+```python
+from argparse import ArgumentParser
+from domgen import DomGenTrainer
 
-For the criterion we chose `CrossEntropy` for all runs. 
+parser = ArgumentParser()
+args = parser.parse_args() # args must be a namespace object / dataclass
 
+trainer = DomGenTrainer(args)
+trainer.fit()
+```
+
+After training, the results of the experiments can be saved by calling
+
+```python
+trainer.save_metrics(trainer.metrics, experiment_path)
+trainer.save_config(f'{experiment_path}/trainer_config.json')
+```
+which save the results of the training to file.
+
+⚡ *Note, that saving the trainer config requires it to be serializable. This needs to be handled individually.* ⚡
+
+Additionally, we provide functions to plot the results:
+
+```python
+from domgen.utils import plot_accuracies, plot_training_curves
+
+# experiment_path is the path to the directory where 
+# the results of the run were saved to
+experiment_path = f"{args.log_dir}/{args.experiment}"
+
+plot_accuracies(root_path=experiment_path, save=True, show=False)
+plot_training_curves(base_dir=experiment_path, show=False)
+```
+
+### Available Augmentation Strategies
+
+We provide a range of augmentation strategies:
+
+* `no_augment`: This is the identity transformation.
+* `mixup`: Using the implementation of PyTorch [here](https://pytorch.org/vision/main/generated/torchvision.transforms.v2.MixUp.html).
+* `cutmix`: Using the implementation of PyTorch [here](https://pytorch.org/vision/main/generated/torchvision.transforms.v2.CutMix.html).
+* `augmix`: Using the implementation of PyTorch [here](https://pytorch.org/vision/main/generated/torchvision.transforms.v2.AugMix.html).
+* `randaugment`: Using the implementation of PyTorch [here](https://pytorch.org/vision/main/generated/torchvision.transforms.v2.RandAugment.html).
+* `mixstyle`: Using our own implementation based on [Zhou et al. 2021](https://arxiv.org/abs/2107.02053).
+* `pacs_custom`: A set of handcrafted image-level augmentations.
+* `medmnistc`: We provide a wrapper for [di Salvo et al. 2024](https://arxiv.org/pdf/2406.17536).
+
+For both `pacs_custom` and `medmnistc` you need to specify an additional field in the config `aug_dict`, that specifies which of the augmentations you want to use.
+
+You can extend this by adding new augmentation strategies. See [Extending the Code](#Extending the Code).
+
+### Hyperparameters
+
+We provide configuration files for our models with the hyperparameters that worked best. Alternatively, you can run your own trials.
 To run a trial run for one model-config simply run:
 
 ```console
 python tune_config --data_config [PATH/TO/CONFIG.yaml] --hp_config [PATH/TO/CONFIG.yaml]
 ```
+Additionally, we provide scripts for tuning all models of a certain class as well as running a full sweep on all configs.
 
-To run a trial sweep for all models of a certain class (e.g. pretrained `resnet18` -> `resnet18-pretrained`), run:
 
-```console
-sh run_trials.sh [modelclass]
-```
-on Unix-based systems or
-
-```console
-run_trials.bat [modelclass]
-```
-on Windows. For a full sweep of all models, run:
-
-```console
-hp_full_sweep.ps1
-```
-
-This will train a total of (num_models * num_domains * num_samples) => 8 * 4 * 30 = 960 models.
 ## Data
+
+---
 
 We ran our experiments on two common domain generalization benchmarks: `PACS` and `Camelyon17`.
 For convenience, we provide a utility script, that downloads both datasets and prepares the necessary directory structure.
@@ -73,6 +129,8 @@ House, and Person, making it suitable for evaluating models across diverse style
   <img src="imgs/pacs.png" alt="Camelyon" style="width:100%">
   <figcaption>Fig.2 - Snippet from the PACS dataset. The images are 224x224 pixels and span seven classes over four domains.</figcaption>
 </figure>
+
+
 
 ```tex
 @misc{li2017deeperbroaderartierdomain,
@@ -113,32 +171,35 @@ year={2018},
 publisher={IEEE}
 }
 ```
+
+## Extending the Code
+
+---
+
 ### Adding datasets
 
 You can easily extend this repository by adding additional datasets. For that, you need to make sure that the dataset is placed in the `datasets` directory
 and follows the structure as shown (subdirectories for each domain containing the class directories):
 
 ```console
-├── PACS
-│   ├── art_painting
-│   │   ├── dog
-│   │   ├── elephant
-│   │   ├── giraffe
-│   │   ├── guitar
-│   │   ├── horse
-│   │   ├── house
-│   │   └── person
-│   ├── cartoon
-│   │   ├── dog
-│   │   ├── elephant
-│   │   ├── giraffe
-│   │   ├── guitar
-│   │   ├── horse
-│   │   ├── house
-│   │   └── person
+├── dataset_root
+│   ├── domain1
+│   │   ├── cls1
+│   │   ├── cls2
+│   │   ├── ...
+│   ├── domain2
+│   │   ├── cls1
+│   │   ├── cls2
+│   │   ├── ...
 ...
 
 ```
+
+### Adding Augmentation Strategies
+
+tbc.
+
+
 
 ### Resources
 
