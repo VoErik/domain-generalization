@@ -4,8 +4,6 @@ import albumentations as A
 import matplotlib.pyplot as plt
 import torch
 from albumentations.pytorch import ToTensorV2
-from PIL import Image
-from pathlib import Path
 
 
 def denormalize(
@@ -110,51 +108,21 @@ def plot_augmented_grid(
     plt.show()
 
 
-def plot_images_from_folder(
-        folder_path: str,
-        original_image_path: str,
-        grid_cols: int = 4,
-        file_extensions: tuple = (".png", ".jpg", ".jpeg")
-):
-    """
-    Reads images from a folder and plots them in a grid.
-
-    :param folder_path: Path to the folder containing images.
-    :param original_image_path: Path to the original image to include as the first image.
-    :param grid_cols: Number of columns in the grid layout. Defaults to 4.
-    :param file_extensions: Tuple of valid image file extensions to consider.
-    """
-    folder = Path(folder_path)
-    image_paths = [p for p in folder.iterdir() if p.suffix.lower() in file_extensions]
-
-    if not image_paths:
-        print("No images found in the folder.")
-        return
-
-    image_paths.insert(0, Path(original_image_path))
-
-    grid_rows = (len(image_paths) + grid_cols - 1) // grid_cols
-
-    fig, axes = plt.subplots(grid_rows, grid_cols, figsize=(4 * grid_cols, 4 * grid_rows))
-    axes = axes.flatten()
-
-    for idx, ax in enumerate(axes):
-        if idx < len(image_paths):
-            img = Image.open(image_paths[idx])
-            ax.imshow(img)
-            ax.set_title(image_paths[idx].name)
-            ax.axis("off")
-        else:
-            ax.axis("off")
-
-    plt.tight_layout()
-    plt.show()
-
-
-def get_examples() -> Dict:
+def get_examples(name: str) -> Dict:
     """
     Returns a dictionary of examples for the visualization functions.
     Probabilities are adapted to show up for every visualization attempt.
+
+    Args:
+        name (str): The name of the desired augmentation dictionary. Options include:
+                    - "pacs"
+                    - "camelyon17"
+                    - "shared"
+                    - "custom"
+                    - "presentation"
+
+    Returns:
+        Dict: The corresponding augmentation dictionary, or an empty dictionary if the name is invalid.
     """
 
     blur = A.Compose([A.Blur((3, 7), 1), ToTensorV2()])
@@ -277,5 +245,13 @@ def get_examples() -> Dict:
         "Mask + Color": masking_color
     }
 
-    return presentation
+    datasets = {
+        "pacs": pacs,
+        "camelyon17": camelyon17,
+        "shared": shared,
+        "custom": custom_aug,
+        "presentation": presentation
+    }
+
+    return datasets.get(name.lower(), {})
 
