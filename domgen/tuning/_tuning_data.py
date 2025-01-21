@@ -78,25 +78,26 @@ def create_datasets(
             continue
 
         for class_folder in os.listdir(domain_path):
-            class_path = os.path.join(domain_path, class_folder)
+            if os.path.isdir(os.path.join(domain_path, class_folder)):
+                class_path = os.path.join(domain_path, class_folder)
 
-            if class_name and class_folder != class_name:
-                continue
-            if not os.path.exists(class_path):
-                continue
+                if class_name and class_folder != class_name:
+                    continue
+                if not os.path.exists(class_path):
+                    continue
 
-            images = [os.path.join(class_path, img) for img in os.listdir(class_path) if img.endswith((".jpg", ".png", ".jpeg"))]
+                images = [os.path.join(class_path, img) for img in os.listdir(class_path) if img.endswith((".jpg", ".png", ".jpeg"))]
 
-            if subsample is not None:
-                images = random.sample(images, min(subsample, len(images)))
+                if subsample is not None:
+                    images = random.sample(images, min(subsample, len(images)))
 
-            if domain == leave_out_domain:
-                test_data.extend([(img, class_folder, domain) for img in images])
-            else:
-                # Split the images into training and validation sets
-                split_idx = int(len(images) * (1 - val_split))
-                train_data.extend([(img, class_folder, domain) for img in images[:split_idx]])
-                val_data.extend([(img, class_folder, domain) for img in images[split_idx:]])
+                if domain == leave_out_domain:
+                    test_data.extend([(img, class_folder, domain) for img in images])
+                else:
+                    # Split the images into training and validation sets
+                    split_idx = int(len(images) * (1 - val_split))
+                    train_data.extend([(img, class_folder, domain) for img in images[:split_idx]])
+                    val_data.extend([(img, class_folder, domain) for img in images[split_idx:]])
 
     # Create the datasets
     train_dataset = TuningDataset(train_data, transform=transform, cls2idx=cls2idx, dom2idx=dom2idx)
