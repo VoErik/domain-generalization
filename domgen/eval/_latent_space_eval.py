@@ -1,10 +1,92 @@
 from platform import architecture
 
-from matplotlib import pyplot as plt
+import numpy as np
+from matplotlib import colors, pyplot as plt
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 import torch
 import torch.nn.functional as F
+from sklearn.preprocessing import StandardScaler
+
+
+def normalize_features(features):
+    """
+    Normalizes features using z-score normalization (mean=0, std=1).
+
+    :param features: Input feature matrix.
+    :return: Normalized features.
+    """
+    return (features - np.mean(features, axis=0)) / np.std(features, axis=0)
+
+def get_style_statistics_with_reduction(
+        model,
+        dataloader,
+        device,
+        reduction='avg_pool',  # or 'flatten'
+        n_components=2,
+        architecture: str = 'resnet'
+):
+    model.eval()
+    features = {f'block_{i + 1}': [] for i in range(4)}
+    clslabels = []
+    domlabels = []
+
+    # Define block layers (resnet or densenet)
+    if architecture == 'resnet':
+        layer_names = ['layer1', 'layer2', 'layer3', 'layer4']
+    if architecture == 'densenet':
+        layer_names = ['DenseBlock_1', 'DenseBlock_2', 'DenseBlock_3', 'DenseBlock_4']
+    last_layers = [list(getattr(model, name).children())[-1] for name in layer_names]
+
+    def get_hook(block_name):
+        def hook(module, input, output):
+            if reduction == 'avg_pool':
+                pooled = F.adaptive_avg_pool2d(output, (1, 1)).squeeze(-1).squeeze(-1)  # Shape (batch_size, num_channels)
+            elif reduction == 'flatten':
+                pooled = output.view(output.size(0), -1)  # Flatten to (batch_size, num_flattened_features)
+            else:
+                raise ValueError("Invalid reduction method. Use 'avg_pool' or 'flatten'.")
+            features[block_name].append(pooled.detach().cpu())
+
+        return hook
+
+    # Register hooks
+    hooks = []
+    for i, last_layer in enumerate(last_layers):
+        block_name = f'block_{i + 1}'
+        hooks.append(last_layer.register_forward_hook(get_hook(block_name)))
+
+    # Process data
+    with torch.no_grad():
+        for inputs, clstargets, domtargets in dataloader:
+            inputs = inputs.to(device)
+            _ = model(inputs)
+            clslabels.append(clstargets)
+            domlabels.append(domtargets)
+
+    # Remove hooks
+    for hook in hooks:
+        hook.remove()
+
+    # Concatenate and reduce dimensionality
+    reduced_features = {}
+    for block, feats in features.items():
+        feats = torch.cat(feats, dim=0).numpy()  # Concatenate features
+
+        # Normalize features
+        feats = normalize_features(feats)
+
+        if reduction == 'flatten' and n_components is not None:
+            pca = PCA(n_components=50)
+            tsne = TSNE(n_components=n_components)
+            feats = pca.fit_transform(feats)
+            feats = tsne.fit_transform(feats)
+        reduced_features[block] = feats
+
+    clslabels = torch.cat(clslabels, dim=0).numpy()
+    domlabels = torch.cat(domlabels, dim=0).numpy()
+    return reduced_features, clslabels, domlabels
+
 
 def get_features_with_reduction(
         model,
@@ -16,7 +98,8 @@ def get_features_with_reduction(
 ):
     model.eval()
     features = {f'block_{i+1}': [] for i in range(4)}
-    labels = []
+    clslabels = []
+    domlabels = []
 
     if architecture == 'resnet':
         layer_names = ['layer1', 'layer2', 'layer3', 'layer4']
@@ -41,10 +124,11 @@ def get_features_with_reduction(
         hooks.append(last_layer.register_forward_hook(get_hook(block_name)))
 
     with torch.no_grad():
-        for inputs, targets in dataloader:
-            inputs = inputs['image'].to(device)
+        for inputs, clstargets, domtargets in dataloader:
+            inputs = inputs.to(device)
             _ = model(inputs)
-            labels.append(targets)
+            clslabels.append(clstargets)
+            domlabels.append(domtargets)
 
     for hook in hooks:
         hook.remove()
@@ -58,8 +142,9 @@ def get_features_with_reduction(
             feats = reducer.fit_transform(feats)
         reduced_features[block] = feats
 
-    labels = torch.cat(labels, dim=0).numpy()
-    return reduced_features, labels
+    clslabels = torch.cat(clslabels, dim=0).numpy()
+    domlabels = torch.cat(domlabels, dim=0).numpy()
+    return reduced_features, clslabels, domlabels
 
 
 def reduce_dimensionality(
@@ -105,11 +190,13 @@ def reduce_features_by_block(
         reduced_features[block_name] = reduce_dimensionality(features, method, n_components)
     return reduced_features
 
+
 def visualize_features_by_block(
         reduced_features,
         labels,
         savepath: str = '.',
         show: bool = False,
+        labelmap: dict = None,
 ):
     """
     Visualizes reduced features from each block in a grid of subplots.
@@ -120,15 +207,26 @@ def visualize_features_by_block(
     num_blocks = len(reduced_features)
     fig, axes = plt.subplots(1, num_blocks, figsize=(5 * num_blocks, 5))
 
+    unique_labels = np.unique(labels)
+    num_colors = len(unique_labels)
+
+    cmap = plt.get_cmap('tab10')  # 'tab10' supports up to 10 unique values
+    norm = colors.BoundaryNorm(boundaries=np.arange(num_colors + 1) - 0.5, ncolors=num_colors)
+
     for i, (block_name, features) in enumerate(reduced_features.items()):
         ax = axes[i] if num_blocks > 1 else axes
-        scatter = ax.scatter(features[:, 0], features[:, 1], c=labels, cmap='tab10', alpha=0.7)
+        scatter = ax.scatter(features[:, 0], features[:, 1], c=labels, cmap=cmap, norm=norm, alpha=0.7)
         ax.set_title(f'{block_name} Features')
         ax.set_xlabel('Dimension 1')
         ax.set_ylabel('Dimension 2')
         ax.grid(True)
 
-    plt.colorbar(scatter, ax=axes, label='Class Label', orientation='horizontal', pad=0.1)
+    cbar = plt.colorbar(scatter, ax=axes, orientation='horizontal', pad=0.15)
+
+    cbar.set_ticks(np.arange(num_colors))  # Set the number of ticks
+    cbar.set_ticklabels([f'{labelmap[label.item()]}' for label in unique_labels])  # Set the tick labels
+    cbar.set_label('Domains')  # Colorbar label
+
     plt.savefig(f'{savepath}/latentspace.png', dpi=300)
     if show:
         plt.show()
