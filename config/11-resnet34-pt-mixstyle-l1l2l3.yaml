@@ -1,11 +1,11 @@
 # Model and dataset
 model: "ResNet34"
-dataset: "PACS"
+dataset: "camelyon17"
 dataset_dir: "datasets"
 
 # Training hyperparameters
 lr: 0.001
-batch_size: 32
+batch_size: 64
 epochs: 50
 eps: 1e-8
 betas: [0.9, 0.999]
@@ -16,7 +16,7 @@ optimizer: "sgd"
 
 # Early stopping and scheduling
 use_early_stopping: true
-patience: 6
+patience: 5
 use_scheduling: true
 
 # Device and pretraining
@@ -25,9 +25,14 @@ pretrained: true
 
 # Experiment details
 log_dir: "experiments"
-experiment: "resnet34-pt-custom-noise_geometric-pacs"
-num_runs: 10
+experiment: "resnet34-pt-mixstyle-camelyon17_l1l2l3"
+num_runs: 5
 
 # Augmentations
-augmentation_strategy: "pacs_custom"
-aug_dict: "noise_geometric"
+augmentation_strategy: "mixstyle"
+use_mixstyle: true
+mixstyle_layers: ['layer1', 'layer2', 'layer3']
+mixstyle_alpha: 0.3
+mixstyle_p: 0.5
+mix_type: "random"
+visualize_latent: false
