@@ -34,7 +34,7 @@ class DomainDataset(MultiDomainDataset):
     def __init__(
             self,
             root: str,
-            test_domain: int,
+            test_domain: int | None = None,
             augment: Any = None,
             subset: float = None,
     ) -> None:
@@ -140,7 +140,9 @@ class DomainDataset(MultiDomainDataset):
 
         train_loader = DataLoader(train_split, batch_size=batch_size, shuffle=True, drop_last=True)
         val_loader = DataLoader(val_split, batch_size=batch_size, shuffle=True,drop_last=True)
-        test_loader = DataLoader(self.data[self.test_domain], batch_size=batch_size, shuffle=False)
+        test_loader = None
+        if self.test_domain is not None:
+            test_loader = DataLoader(self.data[self.test_domain], batch_size=batch_size, shuffle=False)
 
         return train_loader, val_loader, test_loader
 
