@@ -8,4 +8,4 @@ __all__ = ['imagenet_transform',
            'get_examples',
            'pacs_aug',
            'create_augmentation_pipeline',
-           'Transforms',]
+           'Transforms']
