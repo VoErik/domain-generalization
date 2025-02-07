@@ -171,11 +171,8 @@ class EarlyStopping:
         }
 
 
-
-
-
 def determinism(active: bool = False, seed: int = 42):
-    "Philosopically sad, but necessary for reproducibility."
+    "Philosophically sad, but necessary for reproducibility."
     if active:
         random.seed(seed)
         np.random.seed(seed)
