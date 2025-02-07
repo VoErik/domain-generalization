@@ -83,7 +83,7 @@ class DomGenTrainer:
         self.dataset = args.dataset
         self.num_experiments = args.num_runs
         self.epochs_per_experiment = args.epochs
-        self.device = args.device if args.device else get_device()
+        self.device = get_device()
         self.log_dir = args.log_dir
         self.experiment = args.experiment
         self.silent = args.silent
