@@ -6,7 +6,6 @@ import numpy as np
 from typing import Dict, List, Tuple
 
 from matplotlib.ticker import MaxNLocator, MultipleLocator
-from parcoords import plot_parcoords
 from scipy.signal import savgol_filter
 from typing_extensions import deprecated
 
