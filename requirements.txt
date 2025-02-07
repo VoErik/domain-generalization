@@ -10,7 +10,6 @@ ray~=2.39.0
 matplotlib~=3.9.2
 numpy~=2.1.2
 PyYAML~=6.0.2
-parcoords~=0.1.4
 albumentations~=1.4.22
 scikit-learn~=1.5.2
 pillow~=11.0.0
