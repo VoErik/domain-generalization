@@ -1,7 +1,10 @@
 import torch
+import random
 import torch.optim as optim
 import torch.nn as nn
-from domgen.models import resnet18, resnet34, resnet50, resnet101, resnet152, densenet121, densenet169, densenet201
+import numpy as np
+from domgen.model_training import (resnet18, resnet34, resnet50, resnet101,
+                                   resnet152, densenet121, densenet169, densenet201)
 
 
 def get_optimizer(
@@ -108,4 +111,82 @@ def get_device():
         if torch.backends.mps.is_available() \
         else 'cpu'
     return device
+
+
+class EarlyStopping:
+    """
+    Early stops the training if the monitored metric doesn't improve after a given number of epochs.
+    """
+
+    def __init__(self, patience=10, delta=0.01, mode='min'):
+        """
+        :param patience: Epochs to wait before early stopping.
+        :param delta: Minimum improvement to qualify as significant.
+        :param mode: 'min' for minimizing (e.g., loss), 'max' for maximizing (e.g., accuracy).
+        """
+        self.patience = patience
+        self.min_delta = delta
+        self.mode = mode
+        self.counter = 0
+        self.best_score = None
+        self.stop = False
+        self.is_improvement = (
+            lambda new, best: new < best - self.min_delta if mode == 'min' else new > best + self.min_delta
+        )
+
+    def __call__(self, score, epoch=None, model=None, optimizer=None, checkpoint_path=None):
+        if self.best_score is None or self.is_improvement(score, self.best_score):
+            improvement = abs(self.best_score - score) if self.best_score is not None else 0
+            print(f'Epoch {epoch}: Metric improved by {improvement:.4f}. New best: {score:.4f}')
+            self.best_score = score
+            self.counter = 0
+            if model and checkpoint_path:
+                print(f'Saving best model to {checkpoint_path}')
+                torch.save({
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict() if optimizer else None,
+                    'best_score': self.best_score
+                }, checkpoint_path)
+        else:
+            self.counter += 1
+            print(f'Epoch {epoch}: No improvement. Patience counter: {self.counter}/{self.patience}')
+            if self.counter >= self.patience:
+                print(f'Early stopping at epoch {epoch}.')
+                self.stop = True
+
+    def reset(self):
+        self.counter = 0
+        self.best_score = None
+        self.stop = False
+
+    def serialize(self):
+        """ serialize only the relevant parameters of the early stopping instance. """
+        return {
+            'patience': self.patience,
+            'min_delta': self.min_delta,
+            'mode': self.mode,
+            'counter': self.counter,
+            'best_score': self.best_score,
+            'stop': self.stop
+        }
+
+
+
+
+
+def determinism(active: bool = False, seed: int = 42):
+    "Philosopically sad, but necessary for reproducibility."
+    if active:
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(seed)
+            torch.cuda.manual_seed_all(seed)
+
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    else:
+        torch.backends.cudnn.deterministic = False
+        torch.backends.cudnn.benchmark = True
 

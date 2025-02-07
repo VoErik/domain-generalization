@@ -262,7 +262,7 @@ def _plot_metric_curves(
 
         if save_path:
             save_name = f'{domain}_{metric_name}_plot.png'
-            plot_path = os.path.join(save_path, save_name)
+            plot_path = os.path.join(save_path, 'plots', save_name)
             plt.savefig(plot_path, bbox_inches="tight")
             print(f"Plot saved at {plot_path}")
         if show:
@@ -357,7 +357,7 @@ def _plot_all_domain_averages(
 def plot_training_curves(
         base_dir: str,
         show: bool = True,
-        save_path: str = None
+        save: bool = True
 ) -> None:
     """
     Plot the training curves for each domain.
@@ -366,6 +366,9 @@ def plot_training_curves(
     :param save_path: Path to save the figure. Default is None.
     :return: None
     """
+
+    save_path = base_dir if save else None
+
     run_data = _load_run_data(base_dir)
 
     metrics = [
@@ -377,180 +380,11 @@ def plot_training_curves(
 
     for metric_name, ylabel, title in metrics:
         _plot_metric_curves(
-            base_dir, metric_name, ylabel, title, save_path=base_dir, show=show
+            base_dir, metric_name, ylabel, title, save_path=save_path, show=show
         )
         _plot_all_domain_averages(
-            run_data, metric_name, ylabel, title, save_path=base_dir, show=show
+            run_data, metric_name, ylabel, title, save_path=save_path, show=show
         )
-
-
-@deprecated("Not integrated into this package any longer. Will be reworked in the future.")
-def plot_hyperparameters(
-        data: str | pd.DataFrame,
-        params: List[str] = None,
-        metric_name: str = 'mean_accuracy',
-        title: str = 'Hyperparameters',
-        cmap: plt.cm = plt.cm.viridis,
-        figsize: Tuple[int, int] = (15, 10),
-        filter_optim: str = None
-):
-    if isinstance(data, pd.DataFrame):
-        hp_df = data.copy()
-    else:
-        hp_df = pd.read_csv(data)
-
-    rename_dict = {col: col.split('/')[-1] for col in hp_df.columns}
-    hp_df = hp_df.rename(columns=rename_dict)
-
-    if params:
-        fields = params
-    else:
-        fields = ['lr', 'batch_size', 'momentum', 'weight_decay',
-                  'optimizer', 'betas', 'eps', 'nesterov',
-                  metric_name]
-
-    if filter_optim:
-        if filter_optim == 'adam':
-            hp_df = hp_df[hp_df['optimizer'] == 'adam']
-            fields = ['lr', 'batch_size', 'betas', 'eps', metric_name]
-            scale = [("lr", "log"), ("eps", "log")]
-        elif filter_optim == 'adamw':
-            hp_df = hp_df[hp_df['optimizer'] == 'adamw']
-            fields = ['lr', 'batch_size', 'weight_decay', 'betas', 'eps', metric_name]
-            scale = [("lr", "log"), ("eps", "log"), ("weight_decay", "log")]
-        elif filter_optim == 'sgd':
-            hp_df = hp_df[hp_df['optimizer'] == 'sgd']
-            fields = ['lr', 'batch_size', 'momentum', 'weight_decay', 'nesterov', metric_name]
-            scale = [("lr", "log")]
-        else:
-            raise ValueError("Invalid filter value. Choose from 'adam', 'adamw', or 'sgd'.")
-    else:
-        scale = [("lr", "log"), ("eps", "log"), ("weight_decay", "log")]
-
-    hp_df = hp_df[fields]
-    plot_parcoords(
-        hp_df,
-        labels=fields,
-        color_field=metric_name,
-        scale=scale,
-        title=title,
-        cmap=cmap,
-        figsize=figsize
-    )
-
-    plt.show()
-
-@deprecated("Not integrated into this package any longer. Will be reworked in the future.")
-def load_results(
-        model_trials: List[str],
-        trial_dir: str,
-        fields: List[str],
-        filename: str = 'results.csv'
-) -> pd.DataFrame:
-    """
-    Loads results from hyperparameter tuning into a single dataframe.
-    :param model_trials: List of directories containing the results files.
-    :param trial_dir: Path to base trial directory.
-    :param fields: List of dataframe column names.
-    :param filename: Name of the results file. Default: results.csv
-    :return: Concatenated pd.Dataframe with additional "trial" column.
-    """
-    results = []
-    for trial in model_trials:
-        file_path = os.path.join(trial_dir, trial, filename)
-        if os.path.exists(file_path):
-            df = pd.read_csv(file_path)
-            filtered_df = df[fields].copy()
-            filtered_df["trial"] = trial
-            results.append(filtered_df)
-    return pd.concat(results, ignore_index=True) if results else None
-
-
-@deprecated("Not integrated into this package any longer. Will be reworked in the future.")
-def find_common_configs(
-        domain: pd.DataFrame,
-        tolerance: float = 0.01,
-        fields: List[str] = None,
-        top_n: int = 5,
-        filter_optim: str = None,
-) -> List[str]:
-    """
-    Searches for common hyperparameter configurations. Expects a pd.Dataframe containing the configurations over all domains of a model.
-
-    :param domain: pd.Dataframe containing the configurations.
-    :param tolerance: Tolerance for numerical values. Default 0.01.
-    :param fields: Fields of the dataframe.
-    :param top_n: How many trials to consider from each domain. Default 5.
-    :return: List of common configurations, if any exist.
-    """
-    top_n_by_domain = {}
-
-    if fields is None:
-        fields = ['config/lr', 'config/batch_size', 'config/momentum', 'config/weight_decay',
-                  'config/optimizer', 'config/betas', 'config/eps', 'config/nesterov']
-
-    for dom in domain:
-        domain_results = domain[domain['trial'] == dom]
-
-        grouped = domain_results.groupby(
-            fields)['mean_accuracy'].mean().reset_index()
-
-        top_n_configurations = grouped.sort_values(by="mean_accuracy", ascending=False).head(top_n)
-
-        top_n_by_domain[dom] = top_n_configurations
-
-    common_configs = []
-
-    def is_approx_equal(value1, value2, tolerance):
-        return abs(value1 - value2) <= tolerance
-
-    # ugly, ugly, ugly! infer columns and their types automatically.
-    # but then we also need to pass which cols to ignore!
-    if filter_optim == 'adam':
-        categorical_columns = ['config/betas']
-        numerical_columns = ['config/lr', 'config/batch_size', 'config/eps']
-    elif filter_optim == 'adamw':
-        categorical_columns = ['config/betas']
-        numerical_columns = ['config/lr', 'config/batch_size', 'config/weight_decay', 'config/eps']
-
-    elif filter_optim == 'sgd':
-        categorical_columns = ['config/nesterov']
-        numerical_columns = ['config/lr', 'config/momentum', 'config/weight_decay']
-    else:
-        categorical_columns = ['config/optimizer', 'config/betas', 'config/nesterov']
-        numerical_columns = ['config/lr', 'config/momentum', 'config/weight_decay', 'config/eps']
-
-    for domain_name, domain_data in top_n_by_domain.items():
-        domain_top_configs = domain_data.head(5)
-
-        for idx1, config1 in domain_top_configs.iterrows():
-            is_common = True
-            for other_domain, other_data in top_n_by_domain.items():
-                if other_domain == domain_name:
-                    continue
-
-                other_top_configs = other_data.head(5)
-                match_found = False
-                for idx2, config2 in other_top_configs.iterrows():
-                    categorical_match = all(config1[col] == config2[col] for col in categorical_columns)
-
-                    numerical_match = all(
-                        is_approx_equal(config1[col], config2[col], tolerance) for col in numerical_columns
-                    )
-
-                    if categorical_match and numerical_match:
-                        match_found = True
-                        break
-
-                if not match_found:
-                    is_common = False
-                    break
-
-            if is_common:
-                common_configs.append(config1)
-
-    return common_configs
-
 
 def plot_domain_images(
         dataset_dir: str,

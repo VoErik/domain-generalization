@@ -1,9 +1,7 @@
 import torch.nn as nn
 from torch import Tensor
 from typing import List, Type
-
 from torch.utils import model_zoo
-
 from domgen.augment._mixstyle import MixStyle
 
 

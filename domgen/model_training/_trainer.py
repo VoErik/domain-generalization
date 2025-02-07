@@ -1,22 +1,25 @@
-import argparse
-import json
 import os
+import json
 import pprint
+import logging
+import argparse
+
+from tqdm import tqdm
 from datetime import datetime
 from typing import Tuple, List, Optional
 
 import pandas as pd
+
 import torch
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.tensorboard import SummaryWriter
-from tqdm import tqdm
-import logging
-from ._utils import EarlyStopping
-from ._model_config import get_device, get_model, get_criterion, get_optimizer
-from ..augment._augmentor import Augmentor
-from ..data import DOMAIN_NAMES, get_dataset
-from domgen.eval import get_features_with_reduction, visualize_features_by_block, reduce_features_by_block
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+
+from domgen.augment._augmentor import Augmentor
 from domgen.augment._mixstyle import run_with_mixstyle, run_without_mixstyle
+
+from domgen.model_training._utils import EarlyStopping, get_device, get_model, get_criterion, get_optimizer
+
+from domgen.data import DOMAIN_NAMES, get_dataset
 
 logging.basicConfig(
     level=logging.INFO,
@@ -133,17 +136,6 @@ class DomGenTrainer:
             self.metrics[run]['test'] = self.test_metrics
             self.train_metrics = {}
             self.test_metrics = {}
-            if self.config.get('visualize_latent', 0):
-                block_features, labels = get_features_with_reduction(
-                    model, train_loader, self.device, reduction='avg_pool'
-                )
-                reduced_block_features = reduce_features_by_block(
-                    block_features, method='tsne', n_components=2
-                )
-                latent_path = os.path.join(self.log_dir, self.experiment, f'run_{run}', 'plots')
-                os.makedirs(latent_path, exist_ok=True)
-                visualize_features_by_block(
-                    reduced_block_features, labels, savepath=latent_path)
 
     def _run_epoch(
             self,
@@ -222,7 +214,6 @@ class DomGenTrainer:
     ) -> Tuple[List[dict], dict]:
         train_writer, val_writer, test_writer = self._setup_tb_writers(self.log_dir)
         metrics_summary = []
-        # Todo: include other scheduling strategies -> get_scheduler function
         scheduler = ReduceLROnPlateau(
             optimizer, patience=self.config.get('patience', 5)//2
         ) if self.config.get('use_scheduling', True) else None
