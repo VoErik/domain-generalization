@@ -19,6 +19,7 @@ From `root` run:
 python -m pip install -e .
 ```
 ⚡ Currently there is an issue with `git lfs` where cloning fails for some users (https://github.com/git-lfs/git-lfs/issues/5749). This can be resolved by setting `GIT_CLONE_PROTECTION_ACTIVE=false`. This is but a temporary fix. ⚡
+
 ⚡ Due to the `medmnistc` dependency, we also require `wand` to be installed ⚡
 
 **2. Getting the Data**
@@ -34,7 +35,7 @@ For a single configuration, run
 ```console
 python .\train.py --config "<path-to-config.yaml>"  
 ```
-or run the following to start an entire suite (e.g., training the baselines):
+or run the following to start an entire suite (e.g., training the mixstyle models):
 ```console
 .\assets\scripts\run_training_suite.ps1 "PACS\5-mixstyle" 
 ```
