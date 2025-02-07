@@ -1,0 +1,31 @@
+# Model and dataset
+model: "ResNet34"
+dataset: "PACS"
+dataset_dir: "datasets"
+
+# Training hyperparameters
+lr: 0.001
+batch_size: 32
+epochs: 50
+eps: 1e-8
+betas: [0.9, 0.999]
+
+# Optimization and loss
+criterion: "cross_entropy"
+optimizer: "sgd"
+
+# Early stopping and scheduling
+use_early_stopping: true
+patience: 6
+use_scheduling: true
+
+# Device and pretraining
+device: "cuda"
+pretrained: true
+
+# Experiment details
+log_dir: "experiments"
+experiment: "resnet34-pt-baseline-pacs"
+num_runs: 10
+
+augmentation_strategy: "no_augment"
