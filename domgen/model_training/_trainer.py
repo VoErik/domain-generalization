@@ -294,9 +294,9 @@ class DomGenTrainer:
     ) -> Tuple:
 
         if "_custom" in self.augmentation_strategy:
-            logger.info(f"Using augmentation strategy: {self.augmentation_strategy}-{self.config["aug_dict"]}")
+            logger.info(f"Using augmentation strategy: {self.augmentation_strategy}-{self.config['aug_dict']}")
         elif self.augmentation_strategy == "medmnistc":
-            logger.info(f"Using augmentation strategy: {self.augmentation_strategy}-{self.config["aug_dict"]}")
+            logger.info(f"Using augmentation strategy: {self.augmentation_strategy}-{self.config['aug_dict']}")
         else:
             logger.info(f"Using augmentation strategy: {self.augmentation_strategy}")
         self.augmentor = Augmentor(self.augmentation_strategy, **self.config)
