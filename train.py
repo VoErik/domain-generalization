@@ -1,10 +1,8 @@
 import argparse
-import albumentations as A
 from types import SimpleNamespace
 
-from domgen.models import DomGenTrainer
-from domgen.eval import plot_accuracies, plot_training_curves
-from domgen.utils import config_to_namespace, merge_namespace
+from domgen.model_training import DomGenTrainer, determinism
+from domgen.utils import config_to_namespace, merge_namespace, plot_accuracies, plot_training_curves
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -26,7 +24,6 @@ if __name__ == '__main__':
     parser.add_argument('--num_runs', type=int, help='Number of runs per experiment')
     parser.add_argument('--silent', action='store_true', help='silent mode')
     parser.add_argument('--config', type=str, default=None, help='config file')
-    parser.add_argument('--visualize_latent', type=bool, default=False, help='visualize latent')
 
     # --- get training arguments from either cmd line or config file (yaml / json) --- #
     cmd_args = parser.parse_args()
@@ -36,12 +33,16 @@ if __name__ == '__main__':
     args = merge_namespace(config_namespace, cmd_args)  # cmd line args take precedence
     experiment_path = f'{args.log_dir}/{args.experiment}'
 
+    if args.deterministic:
+        determinism(active=True, seed=args.seed)
+
     # --- train --- #
     trainer = DomGenTrainer(args)
     trainer.fit()
 
     # --- save, plot, etc --- #
     trainer.save_metrics(trainer.metrics, experiment_path)
-    plot_accuracies(root_path=experiment_path, save=True, show=False)
-    plot_training_curves(base_dir=experiment_path, show=False)
-    trainer.save_config(f'{experiment_path}/trainer_config.json')
+
+    if args.epochs > 2:
+        plot_accuracies(root_path=experiment_path, save=True, show=False)
+        plot_training_curves(base_dir=experiment_path, show=False)

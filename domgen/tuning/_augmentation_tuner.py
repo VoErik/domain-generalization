@@ -13,9 +13,12 @@ from ray.tune.schedulers import ASHAScheduler
 from ruamel.yaml import YAML
 from tqdm import tqdm
 
-from domgen.models import get_device, get_model, get_criterion, get_optimizer
+from domgen.model_training import get_device, get_model, get_criterion, get_optimizer
 from domgen.tuning._base_tuner import BaseTuner
 
+#################################################################
+############ CURRENTLY BUGGY AND UNDER CONSTRUCTION #############
+#################################################################
 
 class AugmentationTuner(BaseTuner):
     """

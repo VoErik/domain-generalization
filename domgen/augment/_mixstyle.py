@@ -1,8 +1,9 @@
 import random
-from contextlib import contextmanager
-
 import torch
 import torch.nn as nn
+from contextlib import contextmanager
+
+
 
 """
 Code taken and slightly adapted from:

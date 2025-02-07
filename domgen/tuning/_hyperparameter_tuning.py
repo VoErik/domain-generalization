@@ -12,7 +12,7 @@ from ray.tune.schedulers import ASHAScheduler
 from ruamel.yaml import YAML
 from tqdm import tqdm
 
-from domgen.models import get_model, get_criterion, get_optimizer, get_device
+from domgen.model_training import get_model, get_criterion, get_optimizer, get_device
 from domgen.tuning._base_tuner import BaseTuner
 
 
@@ -89,11 +89,11 @@ class ParamTuner(BaseTuner):
 
         search_space = self.construct_search_space()
         trainable = self.get_trainable()
-        trainable_with_cpu = tune.with_resources(trainable=trainable, resources={'cpu': 2})
+        #trainable_with_cpu = tune.with_resources(trainable=trainable, resources={'cpu': 2})
 
-        #trainable_with_gpu = tune.with_resources(trainable, {"gpu": self.num_gpu})
+        trainable_with_gpu = tune.with_resources(trainable, {"gpu": self.num_gpu})
         tuner = tune.Tuner(
-            trainable_with_cpu,
+            trainable_with_gpu,
             tune_config=tune.TuneConfig(
                 num_samples=self.num_trials,
                 scheduler=ASHAScheduler(metric="mean_accuracy", mode='max'),
@@ -162,7 +162,7 @@ def run_epoch(
     with tqdm(loader, desc=mode.capitalize(), unit="batch", disable=True) as batch:
         for inputs, labels in batch:
 
-            inputs, labels = inputs['image'].to(device), labels.to(device)
+            inputs, labels = inputs.to(device), labels.to(device)
 
             if is_train:
                 optimizer.zero_grad()

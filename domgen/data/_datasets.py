@@ -1,15 +1,16 @@
 import os
-from collections import defaultdict
 import random
-from typing import Any
-
 import numpy as np
+
+from typing import Any
+from collections import defaultdict
+
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, ConcatDataset, Subset
 from torchvision.datasets import ImageFolder
+
 from domgen.augment import imagenet_transform
-from domgen.augment._transforms import combine_augmentations, create_augmentation_pipeline
-from domgen.augment._transforms import all_augmentations, pacs_aug, camelyon17_aug, shared_aug
+
 
 """To add a new dataset, just create a class that inherits from `DomainDataset`."""
 
@@ -171,7 +172,7 @@ def get_dataset(
 
 class PACS(DomainDataset):
     domains = DOMAIN_NAMES['PACS']
-    input_shape = (3, 244, 244)
+    input_shape = (3, 227, 227)
 
     def __init__(self, root, test_domain, **kwargs):
         self.dir = os.path.join(root, "PACS/")
