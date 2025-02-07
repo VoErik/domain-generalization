@@ -18,6 +18,8 @@ From `root` run:
 ```console
 python -m pip install -e .
 ```
+⚡ Currently there is an issue with `git lfs` where cloning fails for some users (https://github.com/git-lfs/git-lfs/issues/5749). This can be resolved by setting `GIT_CLONE_PROTECTION_ACTIVE=false`. This is but a temporary fix. ⚡
+⚡ Due to the `medmnistc` dependency, we also require `wand` to be installed ⚡
 
 **2. Getting the Data**
 
@@ -34,7 +36,7 @@ python .\train.py --config "<path-to-config.yaml>"
 ```
 or run the following to start an entire suite (e.g., training the baselines):
 ```console
-.\assets\scripts\run_training_suite.ps1 "PACS\0-baselines" 
+.\assets\scripts\run_training_suite.ps1 "PACS\5-mixstyle" 
 ```
 You find all configurations we used for our experiments in `assets\config`.
 
@@ -197,10 +199,6 @@ and follows the structure as shown (subdirectories for each domain containing th
 
 ```
 
-### Adding Augmentation Strategies
-
-tbc.
-
 ### Required Libraries
 
 To use this repository, you need the following libraries:
@@ -214,7 +212,7 @@ To use this repository, you need the following libraries:
 * gdown~=5.2.0
 * ray~=2.39.0
 * matplotlib~=3.9.2
-* numpy~=2.1.2
+* numpy<2
 * PyYAML~=6.0.2
 * albumentations~=1.4.22
 * scikit-learn~=1.5.2
@@ -224,10 +222,3 @@ To use this repository, you need the following libraries:
 * opencv-python~=4.10.0.84
 * medmnistc
 * wand > 0.6.10
-
-
-### Resources
-
-Zamanitajeddin et al. (2024): [Benchmarking Domain Generalization Algorithms in Computational Pathology](https://arxiv.org/html/2409.17063v1)
-
-Aminbeidokhti et al. (2023): [Domain Generalization by Rejecting Extreme Augmentations](https://arxiv.org/pdf/2310.06670)
