@@ -1,52 +1,54 @@
 
 # Data Augmentation for Domain Generalization
 
----
-
-Short description of what we do.
-
-## Installation
-
----
-
-
-
-
-+ add requirements
+This is the repository for our domain generalization project we conducted in winter term 2024/25 with the chair for Explainable Artificial Intelligence at Otto-Friedrich-University Bamberg.
+The goal was developing a plug-and-play domain generalization pipeline to test different data augmentation strategies.
 
 ## Components
-
----
-
-* `domgen/augmentor.py`: Definition of augmentation strategies that are handled by an `Augmentor` class during training.
-* `domgen/trainer.py`: Handling of the training process based on a configuration file.
-* `domgen/tuning.py`: Classes for hyperparameter and augmentation tuning.
-* `domgen/domain_dataset.py`: Definition of a dataset class to handle specific domain datasets.
+We provide four modules:
+* `domgen.augment`: Augmentation strategies and handler classes.
+* `domgen.model_training`: Model definitions, utility functions and a trainer class tying it all together.
+* `domgen.tuning`: Classes for hyperparameter and augmentation tuning.
+* `domgen.data`: Definition of a dataset class to handle specific domain datasets.
 
 ## Quickstart
-
----
-
-### Setup
+**1. Setup**
 
 From `root` run:
 ```console
 python -m pip install -e .
 ```
 
-### Using the Trainer
+**2. Getting the Data**
 
-To run experiments, simply instatiate an instance of the `DomGenTrainer`, pass a configuration by either:
-* defining a `config.yaml` (`.json`) file and passing it via the `--config` flag when running `train.py` or
+Run `download_data.py` with either the `--download_pacs`, `--download_camelyon17`, or `--download_all` flag.  
+```console
+python domgen\data\download_data.py --download_pacs
+```
+
+**3. Runnig Experiments**
+
+For a single configuration, run
+```console
+python .\train.py --config "<path-to-config.yaml>"  
+```
+or run the following to start an entire suite (e.g., training the baselines):
+```console
+.\assets\scripts\run_training_suite.ps1 "PACS\0-baselines" 
+```
+You find all configurations we used for our experiments in `assets\config`.
+
+### Using the Trainer Separately
+
+If you want to use the trainer independently of `train.py` you can do so by simply instatiating an instance of the `DomGenTrainer`, and passing a configuration by either:
+* defining a `config.yaml` file and passing it via the `--config` flag when running `train.py` or
 * defining a `dataclass` or similar and passing it to the trainer.
 
 
 ```python
-from argparse import ArgumentParser
-from domgen import DomGenTrainer
+from domgen.model_training import DomGenTrainer
 
-parser = ArgumentParser()
-args = parser.parse_args() # args must be a namespace object / dataclass
+args = ... # args must be a namespace object / dataclass
 
 trainer = DomGenTrainer(args)
 trainer.fit()
@@ -98,7 +100,7 @@ We provide configuration files for our models with the hyperparameters that work
 To run a trial run for one model-config simply run:
 
 ```console
-python tune_config --data_config [PATH/TO/CONFIG.yaml] --hp_config [PATH/TO/CONFIG.yaml]
+.\assets\config\scripts\run_trials.ps1 "<base-model-dir>" "<tune-config.yaml>"
 ```
 Additionally, we provide scripts for tuning all models of a certain class as well as running a full sweep on all configs.
 
@@ -126,7 +128,7 @@ Art painting, Cartoon, and Sketch. The dataset includes seven object classes: Do
 House, and Person, making it suitable for evaluating models across diverse styles and distributions.
 
 <figure>
-  <img src="imgs/pacs.png" alt="Camelyon" style="width:100%">
+  <img src="assets/imgs/pacs.png" alt="Camelyon" style="width:100%">
   <figcaption>Fig.2 - Snippet from the PACS dataset. The images are 224x224 pixels and span seven classes over four domains.</figcaption>
 </figure>
 
@@ -156,7 +158,7 @@ We use the patch-based variant of the dataset (Bandhi 2018). The data can be acc
 
 
 <figure>
-  <img src="imgs/camelyon.png" alt="Camelyon" style="width:100%">
+  <img src="assets/imgs/camelyon.png" alt="Camelyon" style="width:100%">
   <figcaption>Fig.2 - Snippet from the Camelyon17 dataset. The images show 96x96 pixel patches from different patients lymph nodes from five different medical centers in the Netherlands.</figcaption>
 </figure>
 
@@ -199,6 +201,29 @@ and follows the structure as shown (subdirectories for each domain containing th
 
 tbc.
 
+### Required Libraries
+
+To use this repository, you need the following libraries:
+* jupyter
+* torch~=2.5.0
+* torchvision~=0.20.0
+* tqdm~=4.67.0
+* tensorboard
+* pandas~=2.2.3
+* wilds~=2.0.0
+* gdown~=5.2.0
+* ray~=2.39.0
+* matplotlib~=3.9.2
+* numpy~=2.1.2
+* PyYAML~=6.0.2
+* albumentations~=1.4.22
+* scikit-learn~=1.5.2
+* pillow~=11.0.0
+* scipy~=1.14.1
+* typing_extensions~=4.12.2
+* opencv-python~=4.10.0.84
+* medmnistc
+* wand > 0.6.10
 
 
 ### Resources
