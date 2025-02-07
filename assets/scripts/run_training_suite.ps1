@@ -1,4 +1,8 @@
-$CONFIG_DIR = "config\$($args)"
+param (
+    [string]$name
+)
+
+$CONFIG_DIR = "assets\config\$name"
 $SCRIPT = "train.py"
 
 if (-Not (Test-Path -Path $CONFIG_DIR)) {
