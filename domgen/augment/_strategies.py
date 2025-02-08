@@ -14,6 +14,7 @@ class Strategy:
     def __call__(self, *args, **kwargs):
         raise NotImplementedError
 
+
 class MixUpStrategy(Strategy):
     def __init__(self, **kwargs):
         super().__init__()
@@ -88,6 +89,7 @@ class MixStyleStrategy(Strategy):
     def __call__(self, img, labels):
         return img, labels
 
+
 class NoAugment(Strategy):
     def __init__(self, **kwargs):
         super().__init__()
@@ -95,6 +97,7 @@ class NoAugment(Strategy):
 
     def __call__(self, img, labels):
         return img, labels
+
 
 class CustomAugment(Strategy):
     def __init__(self, **kwargs):
@@ -105,8 +108,10 @@ class CustomAugment(Strategy):
     def __call__(self, img, labels):
         return img, labels
 
+
 class PACSCustom(Strategy):
     augments = PACS_CUSTOM
+
     def __init__(self, **kwargs):
         super().__init__()
         self.aug_dict = PACS_CUSTOM[kwargs.get("aug_dict", {})]
@@ -115,11 +120,13 @@ class PACSCustom(Strategy):
     def __call__(self, img, labels):
         return img, labels
 
+
 class MedMNISTC(Strategy):
     """
     Wrapper class for MedMNISTC.
     DiSalvo et al. 2024: https://github.com/francescodisalvo05/medmnistc-api/tree/main
     """
+
     def __init__(self, **kwargs):
         super().__init__()
         self.dataset = kwargs.get("aug_dict", "pathmnist")
@@ -134,6 +141,7 @@ class MedMNISTC(Strategy):
 
     def __call__(self, img, labels):
         return img, labels
+
 
 AUG_STRATEGIES = {
     "no_augment": NoAugment,

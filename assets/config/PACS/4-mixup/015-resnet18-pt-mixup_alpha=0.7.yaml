@@ -4,10 +4,8 @@ dataset: "PACS"
 dataset_dir: "datasets"
 
 # Training hyperparameters
-lr: 1e-3
+lr: 0.001
 batch_size: 32
-momentum: 0.9 # not used
-weight_decay: 0
 epochs: 50
 eps: 1e-8
 betas: [0.9, 0.999]
@@ -15,7 +13,6 @@ betas: [0.9, 0.999]
 # Optimization and loss
 criterion: "cross_entropy"
 optimizer: "sgd"
-nesterov: None # not used
 
 # Early stopping and scheduling
 use_early_stopping: true
@@ -32,10 +29,6 @@ experiment: "resnet18-pt-mixup-alpha-0.7-pacs"
 num_runs: 10
 
 # Augmentations
-mixstyle_layers: None
-mixstyle_alpha: 0.3
-mixstyle_p: 0.5
-mix_type: "random"
-visualize_latent: false
+augmentation_strategy: "mixup"
 use_mixup: true
 mixup_alpha: 0.7

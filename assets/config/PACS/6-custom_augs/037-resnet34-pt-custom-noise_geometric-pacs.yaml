@@ -26,7 +26,7 @@ pretrained: true
 # Experiment details
 log_dir: "experiments"
 experiment: "resnet34-pt-custom-noise_geometric-pacs"
-num_runs: 5
+num_runs: 10
 
 # Augmentations
 augmentation_strategy: "pacs_custom"
