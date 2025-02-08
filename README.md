@@ -41,6 +41,10 @@ or run the following to start an entire suite (e.g., training the mixstyle model
 ```
 You find all configurations we used for our experiments in `assets\config`.
 
+### Notice
+
+If you happen to find bugs - as we're sure there are unspotted ones - please do let us know!:)
+
 ### Using the Trainer Separately
 
 If you want to use the trainer independently of `train.py` you can do so by simply instatiating an instance of the `DomGenTrainer`, and passing a configuration by either:
@@ -95,7 +99,7 @@ We provide a range of augmentation strategies:
 
 For both `pacs_custom` and `medmnistc` you need to specify an additional field in the config `aug_dict`, that specifies which of the augmentations you want to use.
 
-You can extend this by adding new augmentation strategies. See [Extending the Code](#Extending the Code).
+You can extend this by adding new augmentation strategies.
 
 ### Hyperparameters
 
