@@ -5,7 +5,7 @@ dataset_dir: "datasets"
 
 # Training hyperparameters
 lr: 0.001
-batch_size: 32
+batch_size: 64
 epochs: 50
 eps: 1e-8
 betas: [0.9, 0.999]
@@ -26,7 +26,7 @@ pretrained: true
 # Experiment details
 log_dir: "experiments"
 experiment: "resnet34-pt-cutmix-alpha-1.0-camelyon17"
-num_runs: 5
+num_runs: 10
 
 # Augmentations
 augmentation_strategy: "cutmix"

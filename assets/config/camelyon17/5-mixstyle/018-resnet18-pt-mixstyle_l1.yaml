@@ -4,10 +4,8 @@ dataset: "camelyon17"
 dataset_dir: "datasets"
 
 # Training hyperparameters
-lr: 1e-3
-batch_size: 128
-momentum: 0.9 # not used
-weight_decay: 0
+lr: 0.001
+batch_size: 64
 epochs: 50
 eps: 1e-8
 betas: [0.9, 0.999]
@@ -15,11 +13,10 @@ betas: [0.9, 0.999]
 # Optimization and loss
 criterion: "cross_entropy"
 optimizer: "sgd"
-nesterov: None # not used
 
 # Early stopping and scheduling
 use_early_stopping: true
-patience: 5
+patience: 8
 use_scheduling: true
 
 # Device and pretraining
@@ -28,10 +25,12 @@ pretrained: true
 
 # Experiment details
 log_dir: "experiments"
-experiment: "resnet18-pt-mixstyle-camelyon17_l1"
+experiment: "resnet18-pt-mixstyle-camelyon17-l1"
 num_runs: 10
 
 # Augmentations
+augmentation_strategy: "mixstyle"
+use_mixstyle: true
 mixstyle_layers: ['layer1']
 mixstyle_alpha: 0.3
 mixstyle_p: 0.5

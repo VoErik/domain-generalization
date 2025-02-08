@@ -16,7 +16,7 @@ optimizer: "sgd"
 
 # Early stopping and scheduling
 use_early_stopping: true
-patience: 5
+patience: 8
 use_scheduling: true
 
 # Device and pretraining
@@ -25,7 +25,7 @@ pretrained: true
 
 # Experiment details
 log_dir: "experiments"
-experiment: "resnet34-pt-mixstyle-camelyon17_l1l2l3"
+experiment: "resnet34-pt-mixstyle-camelyon17-l1l2l3"
 num_runs: 10
 
 # Augmentations

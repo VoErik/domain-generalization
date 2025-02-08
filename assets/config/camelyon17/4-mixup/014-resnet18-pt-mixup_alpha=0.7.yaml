@@ -29,6 +29,5 @@ experiment: "resnet18-pt-mixup-alpha-0.7-camelyon17"
 num_runs: 10
 
 # Augmentations
-visualize_latent: false
 augmentation_strategy: "mixup"
 mixup_alpha: 0.7

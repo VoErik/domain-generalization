@@ -6,8 +6,6 @@ dataset_dir: "datasets"
 # Training hyperparameters
 lr: 0.001
 batch_size: 64
-momentum: 0.9 # not used
-weight_decay: 0
 epochs: 50
 eps: 1e-8
 betas: [0.9, 0.999]
@@ -33,6 +31,6 @@ num_runs: 10
 
 # Augmentations
 augmentation_strategy: "augmix"
-severity: 2
+severity: 3
 all_ops: false
 mixture_width: 3
